@@ -39,7 +39,7 @@ Implementar Room, repositorio local, lista cronológica y vista de detalle. Es l
 
 - [ ] Cada evento conserva fecha, origen, fragmento redactado, nivel de riesgo y estado del análisis.
 - [ ] El detalle muestra «¿Por qué se marcó?», reasonSimple, señal representada por reasonCode y recomendación.
-- [ ] Distinguir explicación de Gemini, texto de respaldo y análisis no disponible.
+- [ ] Distinguir explicación de Gemini, coincidencia de Google Safe Browsing, texto de respaldo y análisis no disponible; si se usa la señal de Google, mostrar `Advisory provided by Google` con su enlace oficial.
 - [ ] Los registros sobreviven a cerrar/reabrir la app y se pueden consultar sin internet.
 - [ ] Guardar hasta 100 eventos, actualizar el mismo eventId y permitir borrar historial.
 - [ ] Abrir un registro no consulta otra vez a Gemini ni vuelve a emitir alertas.
@@ -72,7 +72,8 @@ Conectar `POST /v1/analyze` y guardar la respuesta validada con su explicación,
 
 **Dependencias:** A-05, B-01 y B-02; ensayo conjunto con B-05.
 
-- [ ] Notificación real → Gemini → alerta visual → registro consultable.
+- [ ] Notificación real → Gemini y, si hay URL, Safe Browsing → alerta visual → registro consultable.
+- [ ] Extraer como máximo tres URLs HTTP(S) antes de redactar el texto para Gemini y enviarlas en el campo separado `urls`; si hay más, marcar `contentIncomplete=true`. Nunca abrirlas desde Freno.
 - [ ] La justificación del historial coincide con la usada para esa decisión; no se regenera al abrirla.
 - [ ] eventId identifica el registro correcto; errores producen UNKNOWN con causa comprensible.
 - [ ] El circuito funciona sin credenciales de correo ni Telegram.

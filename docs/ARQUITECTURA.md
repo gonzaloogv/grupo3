@@ -1,6 +1,6 @@
 # Arquitectura Kotlin y contrato inicial
 
-Este documento define decisiones propuestas para **2 programadores y 8 horas**. A implementa Android, interfaz e historial; B implementa backend, Gemini, justificaciones y evaluación. No describe una aplicación ya construida. Voz descartada; alarma sonora y overlay opcionales. Correo es P1; Telegram es P2, después del correo y solo con tiempo restante.
+Este documento define decisiones propuestas para **2 programadores y 8 horas**. A implementa Android, interfaz e historial; B implementa backend, Gemini, Google Safe Browsing, justificaciones y evaluación. No describe una aplicación ya construida. Voz descartada; alarma sonora y overlay opcionales. Correo es P1; Telegram es P2, después del correo y solo con tiempo restante.
 
 ## 1. Componentes
 
@@ -12,7 +12,10 @@ flowchart LR
     F --> A[Cliente Kotlin]
     A --> K[Backend Ktor]
     K --> G[Gemini 3.5 Flash-Lite]
-    G --> K
+    K --> B[Google Safe Browsing]
+    G --> R[Fusión conservadora de señales]
+    B --> R
+    R --> K
     K --> P[Política de intervención en Android]
     P --> H
     H --> D[Lista y detalle del motivo]
@@ -31,11 +34,12 @@ flowchart LR
 | Integración Android | NotificationListenerService y notificaciones propias | Captura de eventos y aviso visual; WindowManager solo si se incorpora overlay |
 | Concurrencia | Coroutines y StateFlow | Red fuera del hilo principal y estados explícitos |
 | HTTP/JSON | Ktor Client y kotlinx.serialization | Mismo lenguaje y contratos en ambos lados |
-| Backend | Ktor Server sobre JVM | Análisis con Gemini; ruta de aviso familiar solo al incorporar el extra de correo |
+| Backend | Ktor Server sobre JVM | Orquesta Gemini y Safe Browsing; ruta de aviso familiar solo al incorporar el extra de correo |
 | Configuración local | DataStore | Consentimiento, apps habilitadas y preferencias |
 | Historial del teléfono | Room, base local | Registros y justificaciones persistentes; hasta 100 eventos |
 | Caché del backend | Memoria con límites | Resultados temporales, sin persistir texto original |
 | IA | Gemini API, modelo configurable `gemini-3.5-flash-lite` | Clasificación y explicación breve |
+| Reputación de URLs | Google Safe Browsing Lookup API | Comprueba URLs contra listas de amenazas conocidas sin rastrear la página |
 
 Usar las versiones estables compatibles con la plantilla instalada de Android Studio y fijarlas al inicio. No invertir la hackathon en migrar herramientas. `targetSdk` no debe confundirse con `minSdk`; documentar el usado y probar en el dispositivo real.
 
@@ -48,7 +52,7 @@ app/                 # Android
   platform/          # A: host del overlay, permisos y fallback
   ui/                # A: historial, detalle, ajustes y alerta visual
   history/           # A: entidad Room, DAO y repositorio local
-server/              # B: Ktor y Gemini; correo/Telegram opcionales
+server/              # B: Ktor, Gemini y Safe Browsing; correo/Telegram opcionales
 shared/              # B: DTO y enums Kotlin sin dependencias Android
 docs/                # planificación y resultados de prueba
 ```
@@ -91,7 +95,7 @@ Room permite persistir datos estructurados localmente; se propone para conservar
 
 Insertar una fila por eventId antes de llamar al backend con analysisStatus ANALYZING; actualizarla con COMPLETED o FAILED al obtener resultado. Separar estado técnico de risk: UNKNOWN puede provenir de una evaluación insuficiente o de un fallo. Al reabrir tras una interrupción, pasar pendientes inconclusos a FAILED/UNKNOWN con un motivo local.
 
-Guardar fechas, origen, fragmento redactado de hasta 300 caracteres, indicador de recorte, risk, category, reasonCode, reasonSimple, action, analyzer, model, promptVersion y explanationSource. Mantener 100 registros recientes. La app muestra el motivo guardado para esa decisión; consultar un registro no llama a Gemini ni dispara otra alerta.
+Guardar fechas, origen, fragmento redactado de hasta 300 caracteres, indicador de recorte, risk, category, reasonCode, reasonSimple, action, analyzer, model, promptVersion, explanationSource, decisionSources y urlAssessment. Mantener 100 registros recientes. La app muestra el motivo guardado para esa decisión; consultar un registro no llama a Gemini ni a Safe Browsing y tampoco dispara otra alerta.
 
 Ofrecer borrado del historial y evitar que respuestas pendientes reinserten filas borradas. Si el guardado falla, mostrar la alerta igualmente y comunicar que no pudo registrarse. La base local no se sincroniza ni se incluye en backups automáticos del prototipo. Diseño y estados completos: [Interfaz e historial](INTERFAZ_E_HISTORIAL.md).
 
@@ -125,6 +129,7 @@ Solicitud de ejemplo, con datos sintéticos:
   "source": "SMS",
   "text": "Soy tu hijo, cambié de número. Transferime urgente al alias [ALIAS].",
   "contentIncomplete": false,
+  "urls": [],
   "locale": "es-AR"
 }
 ```
@@ -142,22 +147,34 @@ Respuesta normalizada por el servidor:
   "analyzer": "GEMINI",
   "model": "gemini-3.5-flash-lite",
   "promptVersion": "freno-v1",
-  "explanationSource": "GEMINI"
+  "explanationSource": "GEMINI",
+  "decisionSources": ["GEMINI"],
+  "urlAssessment": {
+    "status": "NO_URL",
+    "provider": "NONE",
+    "threatTypes": []
+  }
 }
 ```
 
-El modelo solo genera risk, category, reasonCode, reasonSimple y action. El servidor añade eventId, analyzer, model, promptVersion y explanationSource según la respuesta realmente utilizada. Android persiste esa versión del resultado; no regenerar explicaciones al abrir el historial.
+Android extrae como máximo tres URLs HTTP(S) completas antes de redactar el texto para Gemini y las envía en `urls`. Si aparecen más de tres, marca `contentIncomplete=true`; el backend valida las URLs recibidas y no abre esos enlaces: los consulta en Safe Browsing. El modelo solo genera risk, category, reasonCode, reasonSimple y action. El servidor añade eventId, analyzer, model, promptVersion, explanationSource, decisionSources y urlAssessment según las respuestas realmente utilizadas. Android persiste esa versión del resultado; no regenerar explicaciones ni repetir consultas al abrir el historial.
 
 Enums:
 
 - `risk`: HIGH, REVIEW, LOW, UNKNOWN.
-- `category`: FAMILY_IMPERSONATION, BANK_PHISHING, CODE_REQUEST, OTHER, NONE, UNKNOWN.
-- `reasonCode`: NEW_NUMBER_AND_URGENT_PAYMENT, CREDENTIAL_REQUEST, CODE_SHARING_REQUEST, INSUFFICIENT_CONTEXT, NO_CLEAR_SIGNAL, OTHER_SIGNAL, ANALYSIS_UNAVAILABLE.
+- `category`: FAMILY_IMPERSONATION, BANK_PHISHING, CODE_REQUEST, URL_THREAT, OTHER, NONE, UNKNOWN.
+- `reasonCode`: NEW_NUMBER_AND_URGENT_PAYMENT, CREDENTIAL_REQUEST, CODE_SHARING_REQUEST, URL_LISTED_AS_THREAT, INSUFFICIENT_CONTEXT, NO_CLEAR_SIGNAL, OTHER_SIGNAL, ANALYSIS_UNAVAILABLE.
 - `action`: VERIFY_KNOWN_CONTACT, AVOID_LINK_AND_VERIFY, DO_NOT_SHARE_CODE, NONE.
 - `analyzer`: GEMINI, UNAVAILABLE; FAKE permitido únicamente en pruebas explícitas.
 - `explanationSource`: GEMINI, TEMPLATE o UNAVAILABLE. Si se usa un texto fijo de respaldo, no rotularlo como explicación generada por Gemini.
+- `decisionSources`: subconjunto no vacío de GEMINI, GOOGLE_SAFE_BROWSING y LOCAL_POLICY; registra qué señales determinaron el resultado final.
+- `urlAssessment.status`: NO_URL, MATCH, NO_MATCH o UNAVAILABLE.
+- `urlAssessment.provider`: GOOGLE_SAFE_BROWSING cuando se intentó la consulta; NONE cuando no había URL.
+- `urlAssessment.threatTypes`: solo valores devueltos por el proveedor, por ejemplo SOCIAL_ENGINEERING o MALWARE; vacío en los demás estados.
 
-UNKNOWN se usa para contenido insuficiente y fallos. Ante fallo técnico: category UNKNOWN, reasonCode ANALYSIS_UNAVAILABLE, analyzer UNAVAILABLE, explanationSource UNAVAILABLE, model null y causa comprensible en reasonSimple. Un fallo de red en el cliente se convierte al mismo resultado local. Nunca devolver LOW como valor por defecto ni presentar un fallo técnico como una estafa detectada.
+UNKNOWN se usa para contenido insuficiente y fallos. Ante fallo técnico de Gemini sin coincidencia de Safe Browsing: category UNKNOWN, reasonCode ANALYSIS_UNAVAILABLE, analyzer UNAVAILABLE, explanationSource UNAVAILABLE, model null y causa comprensible en reasonSimple. Una coincidencia de Safe Browsing puede producir HIGH aun si Gemini falla; en ese caso analyzer UNAVAILABLE, model null, explanationSource TEMPLATE y decisionSources [GOOGLE_SAFE_BROWSING]. Un fallo de red en el cliente se convierte al mismo resultado local UNKNOWN. Nunca devolver LOW como valor por defecto ni presentar un fallo técnico como una estafa detectada.
+
+La política de fusión se ejecuta en Kotlin después de recibir ambas señales: `MATCH` para SOCIAL_ENGINEERING o MALWARE fuerza HIGH, URL_THREAT, URL_LISTED_AS_THREAT, AVOID_LINK_AND_VERIFY y una plantilla local («Google reporta este enlace como potencialmente peligroso; no lo abras y verificá por un canal conocido»). `NO_MATCH` no reduce el riesgo decidido por Gemini. Si Safe Browsing queda UNAVAILABLE o `contentIncomplete=true` y Gemini produciría LOW, devolver UNKNOWN; HIGH o REVIEW de Gemini se conservan. Cuando la advertencia use datos del servicio, la interfaz muestra `Advisory provided by Google` enlazado a [Safe Browsing Advisory](https://developers.google.com/safe-browsing/v4/advisory) y un enlace a la [definición de la amenaza](https://developers.google.com/search/docs/monitor-debug/security/social-engineering); no se coloca esa atribución sobre resultados que provienen solo de Gemini o la política local. Informar en la ayuda que existen falsos positivos y negativos.
 
 ### POST /v1/family-alerts · Extra P1, fuera del MVP obligatorio
 
@@ -179,11 +196,11 @@ Guardar resultados válidos hasta 100 eventos y 15 minutos, asociados a eventId 
 - Un token de demo por dispositivo autentica análisis y, si se implementa, aviso familiar; no es un sistema de cuentas de producción.
 - Limitar cuerpo a 8 KB y texto a 2.000 caracteres; rechazar exceso y marcar truncamiento desde Android.
 - Máximo una solicitud de análisis activa por teléfono y cola de cinco eventos; mostrar degradación si se descartan eventos por saturación.
-- Plazo inicial: 5 segundos para Gemini en servidor y 7 segundos totales en cliente. Son parámetros a ajustar midiendo, no latencias prometidas.
+- Plazo inicial: 5 segundos para Gemini, 1,5 segundos para Safe Browsing y 7 segundos totales en cliente. Ejecutar proveedores en paralelo; son parámetros a ajustar midiendo, no latencias prometidas.
 - Sin reintento automático de clasificación en el MVP. Manejar 429, 5xx, timeout, respuesta bloqueada y JSON inválido.
 - Red de demo preferida: servidor en la notebook y dispositivo por USB con `adb reverse` al puerto local, usando configuración HTTP solo en debug y restringida al destino de desarrollo. Para acceso remoto o una versión distribuida, HTTPS.
 
-## 5. Integración de Gemini
+## 5. Integración de Gemini y Safe Browsing
 
 Usar Google AI Studio para preparar el prompt y las credenciales del proyecto; el servidor llama a la Gemini API. `GEMINI_MODEL=gemini-3.5-flash-lite` será configuración, no una cadena repartida en el código. Modelo y soporte de salida estructurada verificados en la documentación oficial; acceso del equipo pendiente de una prueba autenticada. [Modelo](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite).
 
@@ -225,9 +242,11 @@ La política local fija título, botón y recomendación mediante plantillas por
 
 No habilitar herramientas, navegación ni grounding para esta clasificación. El mensaje no puede cambiar el prompt, los permisos de la app ni el destinatario de los avisos opcionales.
 
+Para Safe Browsing, usar `POST /v4/threatMatches:find` desde el backend con tipos SOCIAL_ENGINEERING y MALWARE. Omitir la llamada cuando `urls` esté vacío, limitar a tres URLs y no descargar su contenido. Encapsular el proveedor detrás de una interfaz para simular MATCH, NO_MATCH, 429 y timeout sin gastar cuota. Respetar `cacheDuration` y las reglas de caché del servicio; una respuesta vacía significa NO_MATCH, no seguridad confirmada. [Lookup API](https://developers.google.com/safe-browsing/v4/lookup-api) · [caché](https://developers.google.com/safe-browsing/v4/caching).
+
 ## 6. Secretos y datos
 
-P0 requiere `GEMINI_API_KEY`, `GEMINI_MODEL` y token de demo como configuración del servidor. El token de acceso del dispositivo se provisiona localmente. Correo agrega remitente, destinatario y credenciales del servicio elegido solo al implementar P1; Telegram agrega `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID` solo en P2. El servidor debe arrancar sin credenciales de canales opcionales. Nunca versionar valores reales. Una clave incorporada a la APK es extraíble; el proxy evita distribuir claves de proveedores. [Gestión de claves de Gemini](https://ai.google.dev/gemini-api/docs/api-key).
+P0 requiere `GEMINI_API_KEY`, `GEMINI_MODEL`, `SAFE_BROWSING_API_KEY` y token de demo como configuración del servidor. El token de acceso del dispositivo se provisiona localmente. Correo agrega remitente, destinatario y credenciales del servicio elegido solo al implementar P1; Telegram agrega `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID` solo en P2. El servidor debe arrancar sin credenciales de canales opcionales. Nunca versionar valores reales. Una clave incorporada a la APK es extraíble; el proxy evita distribuir claves de proveedores. [Gestión de claves de Gemini](https://ai.google.dev/gemini-api/docs/api-key).
 
 Logs técnicos: solo eventId, riesgo, duración, error y versión del prompt; sin mensajes, tokens ni URLs completas. El texto original se procesa en memoria y se descarta; Room guarda únicamente el fragmento redactado y los campos de justificación definidos. Explicar este almacenamiento al activar la app y ofrecer borrado. Pausar deja de enviar nuevos mensajes y conserva el historial; retirar consentimiento deshabilita captura y avisos.
 

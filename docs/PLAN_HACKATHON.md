@@ -1,6 +1,6 @@
 # Freno: plan de producto y hackathon
 
-Plan actualizado para **2 programadores y 8 horas**. A asume Android, interfaz e historial; B asume backend, Gemini, justificaciones y evaluación. Voz descartada; alarma sonora opcional. Las estimaciones son presupuestos de trabajo, no tiempos ya medidos.
+Plan actualizado para **2 programadores y 8 horas**. A asume Android, interfaz e historial; B asume backend, Gemini, Google Safe Browsing, justificaciones y evaluación. Voz descartada; alarma sonora opcional. Las estimaciones son presupuestos de trabajo, no tiempos ya medidos.
 
 ## 1. La propuesta mejorada
 
@@ -19,7 +19,7 @@ La configuración inicial es asistida y consentida. Después, analiza notificaci
 
 Historia principal: llega un mensaje que suplanta a un familiar, dice que cambió de número y solicita una transferencia urgente. Freno presenta una advertencia, recomienda verificar por un canal conocido y guarda el motivo. Después, la persona abre el historial para consultar por qué se marcó. Si se completa correo, también avisa al contacto configurado.
 
-Historia secundaria: llega un mensaje bancario que exige ingresar datos mediante un enlace. Se reutiliza exactamente el mismo flujo.
+Historia secundaria: llega un mensaje bancario que exige ingresar datos mediante un enlace. El backend consulta su reputación en Google Safe Browsing al mismo tiempo que Gemini analiza el texto; la alerta y el historial indican qué señal produjo la decisión.
 
 Control negativo: llega un mensaje cotidiano. El teléfono continúa sin una intervención de Freno.
 
@@ -31,6 +31,7 @@ Control negativo: llega un mensaje cotidiano. El teléfono continúa sin una int
 | --- | --- | --- |
 | P0 | Una fuente real de notificaciones de texto | Elegir SMS o WhatsApp según el teléfono disponible; validar una primero |
 | P0 | Clasificación con Gemini | HIGH, REVIEW, LOW; UNKNOWN para fallos o contenido insuficiente |
+| P0 | Reputación de URLs con Google Safe Browsing | Consultar hasta tres URLs HTTP(S); una coincidencia motiva advertir riesgo alto, una ausencia de coincidencia no garantiza seguridad |
 | P0 | Advertencia visual | Motivo, recomendación y ENTENDIDO; apertura desde notificación |
 | P0 | Historial persistente y detalle | Pantalla principal con registros y justificación; consulta offline y borrado |
 | P0 | Ajustes mínimos | Consentimiento, accesos, estado y pausa desde la pantalla principal |
@@ -50,7 +51,7 @@ Tampoco habrá registro de usuarios, múltiples familiares, pagos, OCR, lectura 
 
 ### Configuración inicial
 
-1. Explicar qué texto se enviará a Gemini y qué fragmento/justificación se conservará localmente.
+1. Explicar qué texto minimizado se enviará a Gemini, que las URLs detectadas se consultarán en Google Safe Browsing y qué fragmento/justificación se conservará localmente.
 2. Activar acceso a notificaciones; superposición solo si se implementa ese extra.
 3. Habilitar los avisos de Freno y probar la alerta visual.
 4. Si se implementó el extra de correo, verificar el destinatario de demo y activar voluntariamente el aviso familiar; omitir este paso en P0.
@@ -78,7 +79,7 @@ ENTENDIDO cierra la advertencia y conserva el registro. No abre el enlace sospec
 
 Al abrir la app: cabecera de protección/pausa y lista cronológica de hasta 100 eventos persistidos con Room. Cada fila muestra fecha, fuente, fragmento redactado, riesgo y resumen del motivo. Tocar un registro abre «¿Por qué se marcó?», la señal detectada, explicación guardada y recomendación.
 
-Ejemplo de motivo: «El mensaje dice que tu familiar cambió de número y pide dinero urgente». Debe corresponder al texto analizado, sin afirmar identidad verificada. Distinguir explicación de Gemini, respaldo de Freno y fallo técnico; UNKNOWN nunca se presenta como una estafa detectada.
+Ejemplo de motivo: «El mensaje dice que tu familiar cambió de número y pide dinero urgente». Debe corresponder a evidencia observada, sin afirmar identidad verificada. Distinguir explicación de Gemini, coincidencia de Google Safe Browsing, respaldo de Freno y fallo técnico. Una coincidencia puede producir HIGH; `NO_MATCH` solo significa que Google no reportó esa URL en la consulta y nunca se presenta como garantía de seguridad.
 
 El historial sobrevive a cerrar/reabrir, funciona offline y permite borrado. Consultarlo no vuelve a ejecutar Gemini ni dispara alarmas. Ver [diseño de interfaz e historial](INTERFAZ_E_HISTORIAL.md).
 
@@ -99,14 +100,18 @@ Asunto del correo: «Freno: mensaje sospechoso detectado». No adjuntar el texto
 
 ## 5. Decisiones que hacen viable el proyecto
 
-- **Kotlin en Android y servidor.** Un backend pequeño con Ktor concentra Gemini; los adaptadores de correo y Telegram se agregan solo si sobra tiempo. La APK no lleva secretos de proveedores.
+- **Kotlin en Android y servidor.** Un backend pequeño con Ktor concentra Gemini y Safe Browsing; los adaptadores de correo y Telegram se agregan solo si sobra tiempo. La APK no lleva secretos de proveedores.
 - **Una app y un servicio pequeño.** Room solo en el teléfono para historial; backend sin base de datos, microservicios ni colas externas.
 - **IA con salida estructurada.** La lógica de la app decide cómo intervenir; el modelo no ejecuta acciones ni abre enlaces.
+- **Señales en paralelo.** Con URLs, el backend consulta Safe Browsing y Gemini concurrentemente; sin URLs, omite la consulta de reputación. Safe Browsing compara contra listas conocidas y no navega ni descarga la página.
+- **Fusión conservadora.** `MATCH` eleva el resultado a HIGH. `NO_MATCH` nunca reduce el riesgo de Gemini. Si la reputación no está disponible, hay URLs sin consultar o el contenido está incompleto, un LOW de Gemini se convierte en UNKNOWN.
 - **Filtrado conservador.** Eliminar notificaciones propias, duplicadas o sin texto; analizar todos los mensajes elegibles de la fuente seleccionada. No depender de palabras clave para decidir qué llega a Gemini.
 - **Dispositivo elegido desde el inicio.** Probar captura y persistencia reales. Overlay solo con tiempo restante y prueba máxima de 20 minutos; la base abre la alerta desde notificación.
 - **Un contacto fijo para el extra.** Destinatario de correo configurado manualmente; configuración multiusuario queda para después.
 
 El modelo oficial es `gemini-3.5-flash-lite` y admite salida estructurada. La primera prueba debe comprobar acceso y cuota en el proyecto del equipo; esta planificación no ejecutó una solicitud autenticada. [Documentación de Google](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite).
+
+Para reputación se usa la API Lookup de Google Safe Browsing desde Ktor, con clave guardada únicamente en el servidor. El servicio es gratuito para usos no comerciales, condición compatible con la demo de hackathon; si el producto se comercializa debe reevaluarse y considerar Web Risk. [Lookup API](https://developers.google.com/safe-browsing/v4/lookup-api) · [uso permitido y atribución](https://developers.google.com/safe-browsing/reference/Appropriate.Usage).
 
 ## 6. Cronograma paralelo de 8 horas
 
@@ -114,8 +119,8 @@ El modelo oficial es `gemini-3.5-flash-lite` y admite salida estructurada. La pr
 | --- | --- | --- | --- |
 | 0:00–0:30 | Crear app, preparar teléfono y fuente | Crear servidor y acordar DTO | App, health y contrato inicial |
 | 0:30–1:30 | Capturar notificación e iniciar pantalla de alerta | API y primera clasificación real | Captura y Gemini probados por separado |
-| 1:30–3:00 | Room, lista y detalle con datos simulados | Errores, 12 casos y caché | Historial persistente con justificaciones de prueba |
-| 3:00–4:00 | Extracción, coordinador e inicio de cliente real | Preparar contrato real y evaluación inicial | Pipeline de captura/historial; integración real en curso |
+| 1:30–3:00 | Room, lista y detalle con datos simulados | Safe Browsing, fusión de señales y errores | Reputación de URL e historial con justificaciones de prueba |
+| 3:00–4:00 | Extracción, coordinador e inicio de cliente real | Corpus, caché y evaluación inicial | Pipeline de captura/historial; integración real en curso |
 | 4:00–5:00 | Terminar cliente, ajustes y manejo de fallos | Ensayo conjunto, motivo persistido y entorno reproducible | Circuito completo con historial; congelar P0 |
 | 5:00–6:00 | Permisos, duplicados, persistencia, borrado y texto grande | Lote reservado, coherencia de motivos y fallos de API | Resultados anotados y fallos críticos corregidos |
 | 6:00–7:00 | APK candidata y operación del teléfono | Guion, grabación y apoyo al ensayo | Dos demos seguidas y video de respaldo |
@@ -130,6 +135,7 @@ Correo y Telegram no tienen un bloque obligatorio. Si P0 se completa antes o que
 - **Si se intenta overlay y supera 20 minutos:** conservar notificación que abre la alerta visual. Mostrar ese toque en la demo; no afirmar apertura automática.
 - **Si no hay fuente real disponible:** usar una entrada de prueba desde debug para verificar el circuito, sin construir un simulador con UI. Identificar la simulación y marcar captura real como pendiente.
 - **Si Gemini no está disponible:** usar respuestas de prueba para integrar y mostrar claramente «modo demo». No sustituir el modelo elegido en silencio ni afirmar que hubo análisis en vivo.
+- **Si Safe Browsing no está disponible:** conservar HIGH/REVIEW de Gemini; un mensaje con URL que solo obtendría LOW pasa a UNKNOWN. Mostrar «No se pudo consultar la reputación del enlace» y no afirmar que es seguro.
 - **Si no sobra tiempo:** entregar alerta visual e historial con motivos; alarma, correo y Telegram quedan pendientes.
 - **Si Android queda sobrecargado:** conservar lista/detalle y ajustes mínimos; descartar gráficos, filtros, sonido y overlay. El historial solicitado sigue en P0. B prepara casos y material de demo.
 
