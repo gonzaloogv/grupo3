@@ -70,6 +70,10 @@ clasificar el texto. Si falla o excede el plazo, devuelve `UNKNOWN` con
 
 ## Arranque local
 
+La guía completa de arranque, prompt versionado y evaluación de los seis casos
+de desarrollo está en [B-07: evaluación reproducible](docs/EVALUATION.md).
+La evaluación usa Gemini real y reputación simulada explícita; no ejecuta el lote reservado.
+
 Copiar `.env.example` a `backend/.env`, completar `GEMINI_API_KEY`,
 `SAFE_BROWSING_API_KEY` y `DEMO_API_TOKEN`, y ejecutar
 `./gradlew :server:run` desde `backend/`.

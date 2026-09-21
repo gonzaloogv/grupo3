@@ -88,6 +88,7 @@ Safe Browsing al mismo tiempo que Gemini analiza el texto.
 - **Caché de resultados**: El servidor retiene hasta 100 resultados de análisis durante 15 minutos (`ANALYSIS_CACHE_MAX_ENTRIES` y `ANALYSIS_CACHE_TTL_MINUTES`).
 - **Reutilización por `eventId`**: Consultas repetidas con el mismo `eventId` y contenido completo idéntico reutilizan el resultado, incluso si llegan simultáneamente. Se compara un SHA-256 de la solicitud normalizada; la caché no conserva el texto original.
 - **Detección de colisión**: Cambiar texto, URLs, origen, idioma o `contentIncomplete` de un `eventId` activo devuelve `409 Conflict`.
+- **Excepción MATCH**: Una coincidencia de reputación no se reutiliza desde esta caché: se vuelve a evaluar, conservando la detección de conflictos. El adaptador de Google decide si su coincidencia sigue vigente según `cacheDuration`. Esto puede repetir Gemini, pero no prolonga una advertencia vencida por los 15 minutos del análisis. El historial Android debe distinguir una decisión histórica de una advertencia nueva.
 - **Lectura acotada**: Se leen como máximo 8.193 bytes antes de rechazar el exceso, incluso sin `Content-Length`. La coordinación usa 128 bloqueos fijos; eventos distintos que coincidan en un bloqueo pueden esperar entre sí. Caché y coordinación son locales a una instancia, no distribuidas.
 
 Ejemplo con una URL:

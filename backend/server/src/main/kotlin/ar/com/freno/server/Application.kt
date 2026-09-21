@@ -18,8 +18,8 @@ import java.time.Duration
 import java.time.ZoneId
 import java.util.TimeZone
 
-fun main() {
-    val config = ServerConfig.fromDotEnv()
+fun main(args: Array<String>) {
+    val config = ServerConfig.fromDotEnv(java.nio.file.Path.of(args.firstOrNull() ?: ".env"))
     TimeZone.setDefault(TimeZone.getTimeZone(ZoneId.of(config.timeZone)))
 
     val client = HttpClient(CIO) {

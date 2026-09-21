@@ -14,7 +14,7 @@ import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.header
 import io.ktor.server.request.receiveChannel
-import io.ktor.utils.io.readRemaining
+import io.ktor.utils.io.readBuffer
 import kotlinx.io.readByteArray
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
@@ -56,7 +56,7 @@ fun Application.configureRoutes(
                     return@post
                 }
 
-                val bodyBytes = call.receiveChannel().readRemaining(MAX_BODY_BYTES.toLong() + 1).readByteArray()
+                val bodyBytes = call.receiveChannel().readBuffer(MAX_BODY_BYTES.toLong() + 1).readByteArray()
                 if (bodyBytes.size > MAX_BODY_BYTES) {
                     call.respond(HttpStatusCode.PayloadTooLarge)
                     return@post

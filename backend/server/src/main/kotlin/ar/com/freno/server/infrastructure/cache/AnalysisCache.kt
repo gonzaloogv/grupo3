@@ -2,6 +2,7 @@ package ar.com.freno.server.infrastructure.cache
 
 import ar.com.freno.shared.contract.AnalysisResult
 import ar.com.freno.shared.contract.AnalysisRequest
+import ar.com.freno.shared.contract.UrlAssessmentStatus
 import ar.com.freno.server.application.RiskAnalyzer
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -50,7 +51,11 @@ class AnalysisCache(
         pruneExpired(clock.instant())
         val entry = cache[eventId] ?: return CacheLookupResult.Miss
         return if (entry.fingerprint == fingerprint(text)) {
-            CacheLookupResult.Hit(entry.result)
+            // The DTO has no Google expiration. Never extend a MATCH's cacheDuration
+            // via this independent 15-minute cache. The provider owns its positive TTL.
+            if (entry.result.urlAssessment.status == UrlAssessmentStatus.MATCH) {
+                CacheLookupResult.Miss
+            } else CacheLookupResult.Hit(entry.result)
         } else {
             CacheLookupResult.Conflict
         }

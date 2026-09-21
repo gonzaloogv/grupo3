@@ -92,6 +92,18 @@ class AnalysisCacheTest {
         assertIs<CacheLookupResult.Hit>(cache.get("event-4", "Texto 4"))
     }
 
+    @Test
+    fun `Google match must be reassessed but event identity still conflicts`() {
+        val cache = AnalysisCache()
+        val result = sampleResult("event-1").copy(urlAssessment = UrlAssessment(
+            UrlAssessmentStatus.MATCH, UrlAssessmentProvider.GOOGLE_SAFE_BROWSING,
+            listOf(ar.com.freno.shared.contract.UrlThreatType.SOCIAL_ENGINEERING),
+        ))
+        cache.put("event-1", "Texto", result)
+        assertIs<CacheLookupResult.Miss>(cache.get("event-1", "Texto"))
+        assertIs<CacheLookupResult.Conflict>(cache.get("event-1", "Otro texto"))
+    }
+
     private fun sampleResult(eventId: String) = AnalysisResult(
         eventId = eventId,
         risk = Risk.LOW,
