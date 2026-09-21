@@ -74,11 +74,11 @@ Probar con A el recorrido real, los cuatro niveles de riesgo y los estados de re
 
 **Dependencias:** B-01 a B-04 y A-06 para el ensayo conjunto.
 
-- [x] Un evento vuelve con eventId, justificación y urlAssessment correctos, y actualiza la fila correspondiente.
+- [ ] Un evento vuelve con eventId, justificación y urlAssessment correctos, y actualiza la fila correspondiente. Pendiente ensayo Android real; el contrato backend sí está probado.
 - [x] Repetir un análisis completado reutiliza el resultado sin otra llamada a Gemini o Safe Browsing.
 - [x] Mismo eventId con texto distinto se rechaza, sin devolver una clasificación ajena.
 - [x] Rechazar cuerpos mayores a 8 KB y texto superior a 2.000 caracteres.
-- [x] La alerta funciona sin correo/Telegram y abrir el historial no consulta nuevamente ningún proveedor.
+- [ ] La alerta funciona sin correo/Telegram y abrir el historial no consulta nuevamente ningún proveedor. Pendiente ensayo conjunto con Android.
 
 ## B-07 · Evaluación inicial y ejecución reproducible · 60 min
 

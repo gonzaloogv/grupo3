@@ -1,6 +1,12 @@
 package ar.com.freno.server.infrastructure.cache
 
 import ar.com.freno.shared.contract.AnalysisResult
+import ar.com.freno.shared.contract.AnalysisRequest
+import ar.com.freno.server.application.RiskAnalyzer
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.Json
+import java.security.MessageDigest
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -19,6 +25,21 @@ class AnalysisCache(
 ) {
     private val lock = Any()
     private val cache = LinkedHashMap<String, CachedEntry>()
+    // Bounded lock storage; duplicate events share a lock even while analysis is pending.
+    private val stripes = Array(128) { Mutex() }
+
+    suspend fun getOrAnalyze(request: AnalysisRequest, analyzer: RiskAnalyzer): CacheLookupResult =
+        stripes[(request.eventId.hashCode() and Int.MAX_VALUE) % stripes.size].withLock {
+            val content = Json.encodeToString(request)
+            when (val existing = get(request.eventId, content)) {
+                CacheLookupResult.Miss -> {
+                    val result = analyzer.analyze(request)
+                    put(request.eventId, content, result)
+                    CacheLookupResult.Hit(result)
+                }
+                else -> existing
+            }
+        }
 
     init {
         require(maxEntries > 0) { "maxEntries must be positive" }
@@ -28,7 +49,7 @@ class AnalysisCache(
     fun get(eventId: String, text: String): CacheLookupResult = synchronized(lock) {
         pruneExpired(clock.instant())
         val entry = cache[eventId] ?: return CacheLookupResult.Miss
-        return if (entry.text == text) {
+        return if (entry.fingerprint == fingerprint(text)) {
             CacheLookupResult.Hit(entry.result)
         } else {
             CacheLookupResult.Conflict
@@ -40,7 +61,7 @@ class AnalysisCache(
         pruneExpired(now)
         cache.remove(eventId)
         cache[eventId] = CachedEntry(
-            text = text,
+            fingerprint = fingerprint(text),
             result = result,
             expiresAt = now.plus(ttl),
         )
@@ -61,8 +82,12 @@ class AnalysisCache(
     }
 
     private data class CachedEntry(
-        val text: String,
+        val fingerprint: String,
         val result: AnalysisResult,
         val expiresAt: Instant,
     )
+
+    private fun fingerprint(content: String): String =
+        MessageDigest.getInstance("SHA-256").digest(content.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
 }

@@ -13,13 +13,16 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.header
-import io.ktor.server.request.receive
+import io.ktor.server.request.receiveChannel
+import io.ktor.utils.io.readRemaining
+import kotlinx.io.readByteArray
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import kotlinx.serialization.json.Json
 import java.net.URI
+import java.net.URISyntaxException
 import java.time.Duration
 
 private const val MAX_BODY_BYTES = 8 * 1024 // 8 KB = 8192 bytes
@@ -53,7 +56,7 @@ fun Application.configureRoutes(
                     return@post
                 }
 
-                val bodyBytes = call.receive<ByteArray>()
+                val bodyBytes = call.receiveChannel().readRemaining(MAX_BODY_BYTES.toLong() + 1).readByteArray()
                 if (bodyBytes.size > MAX_BODY_BYTES) {
                     call.respond(HttpStatusCode.PayloadTooLarge)
                     return@post
@@ -76,7 +79,7 @@ fun Application.configureRoutes(
                     return@post
                 }
 
-                when (val lookup = analysisCache.get(request.eventId, request.text)) {
+                when (val lookup = analysisCache.getOrAnalyze(request, riskAnalyzer)) {
                     is CacheLookupResult.Hit -> {
                         call.respond(lookup.result)
                     }
@@ -84,9 +87,7 @@ fun Application.configureRoutes(
                         call.respond(HttpStatusCode.Conflict)
                     }
                     is CacheLookupResult.Miss -> {
-                        val result = riskAnalyzer.analyze(request)
-                        analysisCache.put(request.eventId, request.text, result)
-                        call.respond(result)
+                        error("Atomic cache lookup must resolve a miss")
                     }
                 }
             }
@@ -98,6 +99,6 @@ private fun String.isValidHttpUrl(): Boolean =
     try {
         val parsed = URI(this)
         parsed.scheme?.lowercase() in setOf("http", "https") && !parsed.host.isNullOrBlank()
-    } catch (_: IllegalArgumentException) {
+    } catch (_: URISyntaxException) {
         false
     }
