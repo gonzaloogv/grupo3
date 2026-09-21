@@ -13,6 +13,8 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
+import io.ktor.http.HttpStatusCode
+import java.net.URI
 
 fun Application.configureRoutes(
     config: ServerConfig,
@@ -31,8 +33,20 @@ fun Application.configureRoutes(
         authenticate(DEMO_AUTH_PROVIDER) {
             post("/v1/analyze") {
                 val request = call.receive<AnalysisRequest>()
+                if (request.urls.size > 3 || request.urls.any { !it.isValidHttpUrl() }) {
+                    call.respond(HttpStatusCode.BadRequest)
+                    return@post
+                }
                 call.respond(riskAnalyzer.analyze(request))
             }
         }
     }
 }
+
+private fun String.isValidHttpUrl(): Boolean =
+    try {
+        val parsed = URI(this)
+        parsed.scheme?.lowercase() in setOf("http", "https") && !parsed.host.isNullOrBlank()
+    } catch (_: IllegalArgumentException) {
+        false
+    }

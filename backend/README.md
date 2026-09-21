@@ -1,8 +1,9 @@
 # Backend de Freno
 
-Esqueleto del frente B: contrato compartido, API Ktor, Gemini, reputación local
-con el feed de PhishTank, caché y evaluación. La implementación funcional se
-realiza en ramas separadas por feature y se integra mediante PR a `develop`.
+Frente B: contrato compartido, API Ktor, clasificación con Gemini, reputación
+de URLs con Google Safe Browsing y fusión conservadora de ambas señales. La
+evaluación se implementa en ramas posteriores y se integra a `develop` por
+feature.
 
 ## Convenciones base
 
@@ -12,10 +13,8 @@ realiza en ramas separadas por feature y se integra mediante PR a `develop`.
 - Secretos solo en `backend/.env`, ignorado por Git. El archivo
   `backend/.env.example` documenta las variables sin valores sensibles.
 - Gemini permanece detrás del servidor; ninguna clave se distribuye en la APK.
-- PhishTank se consulta mediante una copia local de su feed verificado y activo.
-  Una coincidencia exacta aporta evidencia; no encontrar una URL nunca significa
-  que el mensaje sea seguro.
-- Los datos descargados de PhishTank no se versionan ni reciben texto del usuario.
+- Google Safe Browsing se usa solo para URLs, en el servidor. Una ausencia de
+  coincidencia significa «no reportada», no que el enlace sea seguro.
 
 ## Estructura
 
@@ -34,7 +33,7 @@ backend/
 │       │   │   ├── infrastructure/
 │       │   │   │   ├── cache/
 │       │   │   │   ├── gemini/
-│       │   │   │   └── phishtank/
+│       │   │   │   └── safe_browsing/
 │       │   │   ├── observability/  # Logs sin contenido sensible
 │       │   │   └── plugins/        # Configuración Ktor
 │       │   └── resources/
@@ -43,7 +42,6 @@ backend/
 ├── data/
 │   ├── corpus/{development,reserved}/
 │   ├── evaluation/
-│   └── phishtank/                  # Feed local ignorado por Git
 ├── docs/                           # Contrato y resultados reproducibles
 └── scripts/                        # Arranque, actualización y evaluación
 ```
@@ -54,10 +52,10 @@ Cada rama nace del último `develop`, contiene una sola feature y vuelve por PR:
 
 1. `b-01-api-contract`
 2. `b-02-gemini`
-3. `b-03-error-handling`
-4. `b-04-corpus`
-5. `b-05-android-integration`
-6. `b-06-cache-limits`
+3. `b-03-safe-browsing`
+4. `b-04-fusion-errors`
+5. `b-05-corpus`
+6. `b-06-android-cache-limits`
 7. `b-07-evaluation`
 
 Antes de iniciar una rama: actualizar `develop`, comprobar que el árbol esté
@@ -66,6 +64,26 @@ limpio y no modificar el contrato compartido sin coordinar con Android.
 ## Contrato HTTP
 
 El contrato inicial, los encabezados y ejemplos de B-01 están documentados en
-[`docs/API_CONTRACT.md`](docs/API_CONTRACT.md). Hasta integrar B-02, el servidor
-responde con un analizador determinístico identificado como `FAKE`; no representa
-una llamada real a Gemini.
+[`docs/API_CONTRACT.md`](docs/API_CONTRACT.md). El servidor usa Gemini para
+clasificar el texto. Si falla o excede el plazo, devuelve `UNKNOWN` con
+`analyzer=UNAVAILABLE`; no atribuye esa respuesta a Gemini.
+
+## Arranque local
+
+Copiar `.env.example` a `backend/.env`, completar `GEMINI_API_KEY`,
+`SAFE_BROWSING_API_KEY` y `DEMO_API_TOKEN`, y ejecutar
+`./gradlew :server:run` desde `backend/`.
+El plazo para Gemini se controla con `GEMINI_TIMEOUT_MS`; para la demo se fijó
+en 20 segundos tras observar respuestas variables, una de ellas de 13,2 s.
+Esto prioriza obtener una clasificación y puede superar el objetivo original
+de 7 segundos para mostrar la alerta. El cliente debe contemplar esa espera.
+
+El adaptador de Safe Browsing usa `POST /v4/threatMatches:find`, consulta como
+máximo `SAFE_BROWSING_MAX_URLS`, omite la red cuando no hay URLs y limita cada
+consulta con `SAFE_BROWSING_TIMEOUT_MS`. Conserva coincidencias positivas solo
+durante el `cacheDuration` indicado por Google y limita la caché con
+`SAFE_BROWSING_CACHE_MAX_ENTRIES`. `/v1/analyze` ejecuta la clasificación y la
+reputación en paralelo: una coincidencia fuerza `HIGH`; una ausencia de
+coincidencia no reduce a Gemini; y una reputación no disponible impide devolver
+`LOW` para mensajes con URL. Safe Browsing es para uso no comercial; un
+producto comercial debe evaluar Web Risk.

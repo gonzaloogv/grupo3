@@ -16,11 +16,12 @@ class AnalysisContractSerializationTest {
             source = NotificationSource.SMS,
             text = "Soy tu hijo, cambié de número.",
             contentIncomplete = false,
+            urls = listOf("https://example.com/ingresar"),
             locale = "es-AR",
         )
 
         assertEquals(
-            """{"eventId":"demo-001","source":"SMS","text":"Soy tu hijo, cambié de número.","contentIncomplete":false,"locale":"es-AR"}""",
+            """{"eventId":"demo-001","source":"SMS","text":"Soy tu hijo, cambié de número.","contentIncomplete":false,"urls":["https://example.com/ingresar"],"locale":"es-AR"}""",
             json.encodeToString(request),
         )
     }
@@ -39,7 +40,9 @@ class AnalysisContractSerializationTest {
               "analyzer": "GEMINI",
               "model": "gemini-3.5-flash-lite",
               "promptVersion": "freno-v1",
-              "explanationSource": "GEMINI"
+              "explanationSource": "GEMINI",
+              "decisionSources": ["GEMINI"],
+              "urlAssessment": {"status":"NO_URL","provider":"NONE","threatTypes":[]}
             }
             """.trimIndent(),
         )
@@ -52,6 +55,9 @@ class AnalysisContractSerializationTest {
         assertEquals(Analyzer.GEMINI, result.analyzer)
         assertEquals("gemini-3.5-flash-lite", result.model)
         assertEquals(ExplanationSource.GEMINI, result.explanationSource)
+        assertEquals(listOf(DecisionSource.GEMINI), result.decisionSources)
+        assertEquals(UrlAssessmentStatus.NO_URL, result.urlAssessment.status)
+        assertEquals(UrlAssessmentProvider.NONE, result.urlAssessment.provider)
     }
 
     @Test
@@ -68,7 +74,9 @@ class AnalysisContractSerializationTest {
               "analyzer": "UNAVAILABLE",
               "model": null,
               "promptVersion": "freno-v1",
-              "explanationSource": "UNAVAILABLE"
+              "explanationSource": "UNAVAILABLE",
+              "decisionSources": ["LOCAL_POLICY"],
+              "urlAssessment": {"status":"NO_URL","provider":"NONE","threatTypes":[]}
             }
             """.trimIndent(),
         )
@@ -80,5 +88,38 @@ class AnalysisContractSerializationTest {
         assertEquals(Analyzer.UNAVAILABLE, result.analyzer)
         assertNull(result.model)
         assertEquals(ExplanationSource.UNAVAILABLE, result.explanationSource)
+        assertEquals(listOf(DecisionSource.LOCAL_POLICY), result.decisionSources)
+    }
+
+    @Test
+    fun `listed URL can be represented with its own category and Google provenance`() {
+        val result = json.decodeFromString<AnalysisResult>(
+            """
+            {
+              "eventId": "demo-url",
+              "risk": "HIGH",
+              "category": "URL_THREAT",
+              "reasonCode": "URL_LISTED_AS_THREAT",
+              "reasonSimple": "Google reporta este enlace como potencialmente peligroso; no lo abras.",
+              "action": "AVOID_LINK_AND_VERIFY",
+              "analyzer": "UNAVAILABLE",
+              "model": null,
+              "promptVersion": "freno-v1",
+              "explanationSource": "TEMPLATE",
+              "decisionSources": ["GOOGLE_SAFE_BROWSING"],
+              "urlAssessment": {
+                "status": "MATCH",
+                "provider": "GOOGLE_SAFE_BROWSING",
+                "threatTypes": ["SOCIAL_ENGINEERING"]
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(Category.URL_THREAT, result.category)
+        assertEquals(ReasonCode.URL_LISTED_AS_THREAT, result.reasonCode)
+        assertEquals(UrlAssessmentStatus.MATCH, result.urlAssessment.status)
+        assertEquals(listOf(UrlThreatType.SOCIAL_ENGINEERING), result.urlAssessment.threatTypes)
+        assertEquals(listOf(DecisionSource.GOOGLE_SAFE_BROWSING), result.decisionSources)
     }
 }

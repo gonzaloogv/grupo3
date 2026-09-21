@@ -52,7 +52,9 @@ Al abrir un registro mostrar:
 3. **«¿Por qué se marcó?»**: explicación guardada para ese evento.
 4. **Señal detectada:** etiqueta humana del reasonCode, por ejemplo «Cambio de número y pedido urgente de dinero».
 5. **Qué conviene hacer:** recomendación fija correspondiente a action.
-6. Origen de la explicación: «Análisis de Gemini», «Texto de respaldo de Freno» o «Análisis no disponible».
+6. Origen de la decisión: «Análisis de Gemini», «URL reportada por Google Safe Browsing», «Texto de respaldo de Freno» o «Análisis no disponible»; pueden aparecer dos fuentes si ambas influyeron.
+
+Si el resultado utiliza datos de Safe Browsing, mostrar además `Advisory provided by Google` con enlace a [Safe Browsing Advisory](https://developers.google.com/safe-browsing/v4/advisory) y contexto del tipo de amenaza. No usar esa atribución para decisiones que provienen solo de Gemini o de una plantilla local. En la ayuda, explicar que Google puede omitir sitios riesgosos o marcar por error sitios legítimos.
 
 Ejemplo:
 
@@ -89,8 +91,10 @@ El overlay es opcional y depende de permisos/dispositivo; la demo base puede mos
 | risk / category | Clasificación y tipo de señal; risk null mientras analiza |
 | reasonCode / reasonSimple | Señal y justificación breve validadas; no reconstruirlas al abrir |
 | action | Recomendación de la política local |
-| analyzer / model / promptVersion | Procedencia de la decisión; ocultar versiones en la UI normal |
+| analyzer / model / promptVersion | Procedencia del análisis textual; ocultar versiones en la UI normal |
 | explanationSource | GEMINI, TEMPLATE o UNAVAILABLE para rotular la explicación con honestidad |
+| decisionSources | GEMINI, GOOGLE_SAFE_BROWSING y/o LOCAL_POLICY según qué señales determinaron el resultado |
+| urlAssessment | NO_URL, MATCH, NO_MATCH o UNAVAILABLE, proveedor y tipos de amenaza; no guardar ni mostrar la URL completa |
 
 El servidor proporciona la clasificación y su explicación; Android añade metadatos locales y persiste con Room. La caché del servidor sigue siendo temporal y no reemplaza el historial del teléfono.
 

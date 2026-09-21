@@ -1,6 +1,7 @@
 package ar.com.freno.server
 
 import ar.com.freno.server.application.FakeRiskAnalyzer
+import ar.com.freno.server.application.RiskAnalyzer
 import ar.com.freno.server.config.ServerConfig
 import ar.com.freno.shared.contract.AnalysisResult
 import ar.com.freno.shared.contract.Analyzer
@@ -21,6 +22,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ApplicationTest {
     private val json = Json { ignoreUnknownKeys = false }
@@ -83,6 +85,43 @@ class ApplicationTest {
         assertEquals(Analyzer.FAKE, result.analyzer)
         assertNull(result.model)
         assertEquals(ExplanationSource.TEMPLATE, result.explanationSource)
+        assertTrue(result.decisionSources.isNotEmpty())
+    }
+
+    @Test
+    fun `analyze rejects more than three URLs before invoking analyzer`() = testApplication {
+        var analyzerCalls = 0
+        application {
+            module(testConfig(), RiskAnalyzer {
+                analyzerCalls++
+                FakeRiskAnalyzer().analyze(it)
+            })
+        }
+        val response = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            contentType(ContentType.Application.Json)
+            setBody(validRequestBody().replace("\"locale\"", "\"urls\":[\"https://a.example\",\"https://b.example\",\"https://c.example\",\"https://d.example\"],\"locale\""))
+        }
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertEquals(0, analyzerCalls)
+    }
+
+    @Test
+    fun `analyze rejects non HTTP URLs`() = testApplication {
+        var analyzerCalls = 0
+        application {
+            module(testConfig(), RiskAnalyzer {
+                analyzerCalls++
+                FakeRiskAnalyzer().analyze(it)
+            })
+        }
+        val response = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            contentType(ContentType.Application.Json)
+            setBody(validRequestBody().replace("\"locale\"", "\"urls\":[\"javascript:alert(1)\"],\"locale\""))
+        }
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertEquals(0, analyzerCalls)
     }
 
     private fun testConfig() = ServerConfig(
@@ -91,6 +130,13 @@ class ApplicationTest {
         demoApiToken = demoToken,
         timeZone = "America/Argentina/Buenos_Aires",
         promptVersion = "freno-v1",
+        geminiApiKey = "test-gemini-key",
+        geminiModel = "gemini-3.5-flash-lite",
+        geminiTimeoutMillis = 5_000,
+        safeBrowsingApiKey = "test-safe-browsing-key",
+        safeBrowsingTimeoutMillis = 1_500,
+        safeBrowsingMaxUrls = 3,
+        safeBrowsingCacheMaxEntries = 100,
     )
 
     private fun validRequestBody() =
