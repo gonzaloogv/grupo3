@@ -11,8 +11,8 @@
     ],
     "locale": "es-AR",
     "expectedRisk": "HIGH",
-    "expectedCategory": "BANK_PHISHING",
-    "expectedReasonCode": "CREDENTIAL_REQUEST",
+    "expectedCategory": "URL_THREAT",
+    "expectedReasonCode": "URL_LISTED_AS_THREAT",
     "expectedAction": "AVOID_LINK_AND_VERIFY",
     "reputationFixture": "match-social-engineering"
   },
@@ -91,7 +91,7 @@
     "locale": "es-AR",
     "expectedRisk": "UNKNOWN",
     "expectedCategory": "UNKNOWN",
-    "expectedReasonCode": "INSUFFICIENT_CONTEXT",
+    "expectedReasonCode": "ANALYSIS_UNAVAILABLE",
     "expectedAction": "NONE",
     "reputationFixture": "unavailable-url"
   }
