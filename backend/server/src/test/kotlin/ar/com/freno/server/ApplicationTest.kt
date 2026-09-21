@@ -133,6 +133,9 @@ class ApplicationTest {
         geminiApiKey = "test-gemini-key",
         geminiModel = "gemini-3.5-flash-lite",
         geminiTimeoutMillis = 5_000,
+        safeBrowsingApiKey = "test-safe-browsing-key",
+        safeBrowsingTimeoutMillis = 1_500,
+        safeBrowsingMaxUrls = 3,
     )
 
     private fun validRequestBody() =

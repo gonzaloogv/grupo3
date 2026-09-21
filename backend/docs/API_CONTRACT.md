@@ -79,7 +79,7 @@ solicitud con `400 Bad Request` si excede ese límite o contiene otro esquema.
 Puede omitirse durante la transición del cliente; equivale a `[]`. El servidor
 no abre las URLs en este paso.
 
-Ejemplo con una URL antes de incorporar Google Safe Browsing:
+Ejemplo con una URL antes de fusionar Google Safe Browsing en B-04:
 
 ```json
 {
@@ -94,7 +94,9 @@ Ejemplo con una URL antes de incorporar Google Safe Browsing:
 
 La respuesta mantiene la clasificación textual de Gemini, pero usa
 `"urlAssessment":{"status":"UNAVAILABLE","provider":"NONE","threatTypes":[]}`.
-Esto indica que aún no hubo una consulta real de reputación.
+Esto indica que la ruta aún no utilizó reputación. B-03 implementa y prueba el
+adaptador de Google, pero B-04 será responsable de ejecutarlo junto con Gemini
+y construir la decisión final.
 
 El analizador determinístico `FAKE` solo se usa en pruebas del servidor;
 nunca debe mostrarse como una clasificación real al usuario.

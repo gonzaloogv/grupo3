@@ -40,10 +40,10 @@ Encapsular Google Safe Browsing detrás de `UrlReputationProvider` y consultar h
 
 **Dependencia:** B-01.
 
-- [ ] Estados NO_URL, MATCH, NO_MATCH y UNAVAILABLE; consultar SOCIAL_ENGINEERING y MALWARE.
-- [ ] Omitir el proveedor cuando no hay URL; timeout inicial de 1,5 segundos y sin reintentos ilimitados.
-- [ ] Simular MATCH, NO_MATCH, 429 y timeout; realizar una sola prueba autenticada con la página oficial de prueba de Google.
-- [ ] Respetar `cacheDuration`; NO_MATCH significa «no reportada», nunca «segura».
+- [x] Estados NO_URL, MATCH, NO_MATCH y UNAVAILABLE; consultar SOCIAL_ENGINEERING y MALWARE.
+- [x] Omitir el proveedor cuando no hay URL; timeout inicial de 1,5 segundos y sin reintentos ilimitados.
+- [x] Simular MATCH, NO_MATCH, 429 y timeout; realizar una sola prueba autenticada con la página oficial de prueba de Google.
+- [x] Respetar `cacheDuration`; NO_MATCH significa «no reportada», nunca «segura».
 
 ## B-04 · Fusión conservadora y errores · 45 min
 

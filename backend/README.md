@@ -1,8 +1,9 @@
 # Backend de Freno
 
-Frente B: contrato compartido, API Ktor y clasificación con Gemini. La consulta
-de reputación de URLs con Google Safe Browsing, la caché y la evaluación se
-implementan en ramas posteriores y se integran a `develop` por feature.
+Frente B: contrato compartido, API Ktor, clasificación con Gemini y adaptador
+de reputación de URLs con Google Safe Browsing. La fusión de ambas señales y
+la evaluación se implementan en ramas posteriores y se integran a `develop`
+por feature.
 
 ## Convenciones base
 
@@ -12,8 +13,8 @@ implementan en ramas posteriores y se integran a `develop` por feature.
 - Secretos solo en `backend/.env`, ignorado por Git. El archivo
   `backend/.env.example` documenta las variables sin valores sensibles.
 - Gemini permanece detrás del servidor; ninguna clave se distribuye en la APK.
-- Google Safe Browsing se usará solo para URLs, en el servidor. Una ausencia de
-  coincidencia no equivale a declarar seguro el mensaje.
+- Google Safe Browsing se usa solo para URLs, en el servidor. Una ausencia de
+  coincidencia significa «no reportada», no que el enlace sea seguro.
 
 ## Estructura
 
@@ -51,10 +52,10 @@ Cada rama nace del último `develop`, contiene una sola feature y vuelve por PR:
 
 1. `b-01-api-contract`
 2. `b-02-gemini`
-3. `b-03-error-handling`
-4. `b-04-corpus`
-5. `b-05-android-integration`
-6. `b-06-cache-limits`
+3. `b-03-safe-browsing`
+4. `b-04-fusion-errors`
+5. `b-05-corpus`
+6. `b-06-android-cache-limits`
 7. `b-07-evaluation`
 
 Antes de iniciar una rama: actualizar `develop`, comprobar que el árbol esté
@@ -69,10 +70,17 @@ clasificar el texto. Si falla o excede el plazo, devuelve `UNKNOWN` con
 
 ## Arranque local
 
-Copiar `.env.example` a `backend/.env`, completar `GEMINI_API_KEY` y
-`DEMO_API_TOKEN` y ejecutar `./gradlew :server:run` desde `backend/`.
-`SAFE_BROWSING_API_KEY` se utilizará en la feature posterior de URLs.
+Copiar `.env.example` a `backend/.env`, completar `GEMINI_API_KEY`,
+`SAFE_BROWSING_API_KEY` y `DEMO_API_TOKEN`, y ejecutar
+`./gradlew :server:run` desde `backend/`.
 El plazo para Gemini se controla con `GEMINI_TIMEOUT_MS`; para la demo se fijó
 en 20 segundos tras observar respuestas variables, una de ellas de 13,2 s.
 Esto prioriza obtener una clasificación y puede superar el objetivo original
 de 7 segundos para mostrar la alerta. El cliente debe contemplar esa espera.
+
+El adaptador de Safe Browsing usa `POST /v4/threatMatches:find`, consulta como
+máximo `SAFE_BROWSING_MAX_URLS`, omite la red cuando no hay URLs y limita cada
+consulta con `SAFE_BROWSING_TIMEOUT_MS`. Conserva coincidencias positivas solo
+durante el `cacheDuration` indicado por Google. La integración con el resultado
+final de `/v1/analyze` corresponde a B-04. Safe Browsing es para uso no
+comercial; un producto comercial debe evaluar Web Risk.

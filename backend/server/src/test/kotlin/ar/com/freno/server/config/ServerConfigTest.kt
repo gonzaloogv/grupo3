@@ -19,6 +19,7 @@ class ServerConfigTest {
             mapOf(
                 "DEMO_API_TOKEN" to "local-secret",
                 "GEMINI_API_KEY" to "gemini-test-key",
+                "SAFE_BROWSING_API_KEY" to "safe-browsing-test-key",
                 "SERVER_PORT" to "9090",
                 "APP_TIME_ZONE" to "America/Argentina/Buenos_Aires",
             ),
@@ -29,6 +30,9 @@ class ServerConfigTest {
         assertEquals("gemini-test-key", config.geminiApiKey)
         assertEquals("gemini-3.5-flash-lite", config.geminiModel)
         assertEquals(20_000L, config.geminiTimeoutMillis)
+        assertEquals("safe-browsing-test-key", config.safeBrowsingApiKey)
+        assertEquals(1_500L, config.safeBrowsingTimeoutMillis)
+        assertEquals(3, config.safeBrowsingMaxUrls)
     }
 
     @Test
@@ -36,6 +40,20 @@ class ServerConfigTest {
         assertFailsWith<IllegalArgumentException> {
             ServerConfig.fromEnvironment(mapOf("DEMO_API_TOKEN" to "local-secret"))
         }
+    }
+
+    @Test
+    fun `environment configuration requires a Safe Browsing key`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            ServerConfig.fromEnvironment(
+                mapOf(
+                    "DEMO_API_TOKEN" to "local-secret",
+                    "GEMINI_API_KEY" to "gemini-test-key",
+                ),
+            )
+        }
+
+        assertEquals("SAFE_BROWSING_API_KEY is required", error.message)
     }
 
     @Test
@@ -48,6 +66,9 @@ class ServerConfigTest {
                 GEMINI_API_KEY=file-gemini-key
                 GEMINI_MODEL=gemini-3.5-flash-lite
                 GEMINI_TIMEOUT_MS=1800
+                SAFE_BROWSING_API_KEY=file-safe-browsing-key
+                SAFE_BROWSING_TIMEOUT_MS=900
+                SAFE_BROWSING_MAX_URLS=2
             """.trimIndent())
 
             val config = ServerConfig.fromDotEnv(
@@ -58,6 +79,9 @@ class ServerConfigTest {
             assertEquals("process-token", config.demoApiToken)
             assertEquals("file-gemini-key", config.geminiApiKey)
             assertEquals(1800L, config.geminiTimeoutMillis)
+            assertEquals("file-safe-browsing-key", config.safeBrowsingApiKey)
+            assertEquals(900L, config.safeBrowsingTimeoutMillis)
+            assertEquals(2, config.safeBrowsingMaxUrls)
         } finally {
             Files.deleteIfExists(path)
         }

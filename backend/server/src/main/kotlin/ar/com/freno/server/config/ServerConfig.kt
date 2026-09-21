@@ -13,6 +13,9 @@ data class ServerConfig(
     val geminiApiKey: String,
     val geminiModel: String,
     val geminiTimeoutMillis: Long,
+    val safeBrowsingApiKey: String,
+    val safeBrowsingTimeoutMillis: Long,
+    val safeBrowsingMaxUrls: Int,
 ) {
     init {
         require(port in 1..65535) { "SERVER_PORT must be between 1 and 65535" }
@@ -20,6 +23,9 @@ data class ServerConfig(
         ZoneId.of(timeZone)
         require(geminiApiKey.isNotBlank()) { "GEMINI_API_KEY is required" }
         require(geminiTimeoutMillis > 0) { "GEMINI_TIMEOUT_MS must be positive" }
+        require(safeBrowsingApiKey.isNotBlank()) { "SAFE_BROWSING_API_KEY is required" }
+        require(safeBrowsingTimeoutMillis > 0) { "SAFE_BROWSING_TIMEOUT_MS must be positive" }
+        require(safeBrowsingMaxUrls in 1..3) { "SAFE_BROWSING_MAX_URLS must be between 1 and 3" }
     }
 
     companion object {
@@ -61,6 +67,11 @@ data class ServerConfig(
                     ?: throw IllegalArgumentException("GEMINI_API_KEY is required"),
                 geminiModel = environment["GEMINI_MODEL"] ?: "gemini-3.5-flash-lite",
                 geminiTimeoutMillis = environment["GEMINI_TIMEOUT_MS"]?.toLongOrNull() ?: 20_000,
+                safeBrowsingApiKey = environment["SAFE_BROWSING_API_KEY"]
+                    ?.takeIf(String::isNotBlank)
+                    ?: throw IllegalArgumentException("SAFE_BROWSING_API_KEY is required"),
+                safeBrowsingTimeoutMillis = environment["SAFE_BROWSING_TIMEOUT_MS"]?.toLongOrNull() ?: 1_500,
+                safeBrowsingMaxUrls = environment["SAFE_BROWSING_MAX_URLS"]?.toIntOrNull() ?: 3,
             )
     }
 }
