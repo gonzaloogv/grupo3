@@ -9,16 +9,33 @@
 # Gradle / Kotlin / JVM
 .gradle/
 **/.gradle/
+.kotlin/
 build/
 **/build/
 out/
 *.class
+*.hprof
 
 # IDEs y editores
 .idea/
 *.iml
+*.ipr
+*.iws
 .vscode/
 *.swp
+
+# Configuración local de Android
+local.properties
+.externalNativeBuild/
+.cxx/
+captures/
+*.jks
+*.keystore
+
+# Skills y export de referencia instalados localmente
+/.agents/skills/emil-design-eng/
+/skills-lock.json
+/front/UX UI Design/
 
 # Logs y archivos temporales
 *.log
@@ -33,3 +50,8 @@ backend/data/phishtank/*
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Herramientas y entornos descargados localmente
+/tools/*/
+/tools/*.zip
+/tools/studio-local.vmoptions
