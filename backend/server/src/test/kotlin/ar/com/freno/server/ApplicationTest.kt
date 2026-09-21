@@ -136,6 +136,7 @@ class ApplicationTest {
         safeBrowsingApiKey = "test-safe-browsing-key",
         safeBrowsingTimeoutMillis = 1_500,
         safeBrowsingMaxUrls = 3,
+        safeBrowsingCacheMaxEntries = 100,
     )
 
     private fun validRequestBody() =

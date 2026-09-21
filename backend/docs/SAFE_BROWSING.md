@@ -15,7 +15,10 @@ Consulta las listas `MALWARE` y `SOCIAL_ENGINEERING` para `ANY_PLATFORM`.
 
 Las coincidencias positivas se conservan como máximo durante el
 `cacheDuration` de cada respuesta. Las respuestas vacías de v4 no incluyen un
-plazo negativo, por lo que este adaptador no inventa uno.
+plazo negativo, por lo que este adaptador no inventa uno. La caché elimina
+entradas vencidas en cada consulta, conserva como máximo
+`SAFE_BROWSING_CACHE_MAX_ENTRIES` URLs (100 por defecto) y usa un hash SHA-256
+como clave interna para no retener la URL completa después de procesarla.
 
 ## Prueba autenticada
 

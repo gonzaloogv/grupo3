@@ -33,6 +33,7 @@ class ServerConfigTest {
         assertEquals("safe-browsing-test-key", config.safeBrowsingApiKey)
         assertEquals(1_500L, config.safeBrowsingTimeoutMillis)
         assertEquals(3, config.safeBrowsingMaxUrls)
+        assertEquals(100, config.safeBrowsingCacheMaxEntries)
     }
 
     @Test
@@ -69,6 +70,7 @@ class ServerConfigTest {
                 SAFE_BROWSING_API_KEY=file-safe-browsing-key
                 SAFE_BROWSING_TIMEOUT_MS=900
                 SAFE_BROWSING_MAX_URLS=2
+                SAFE_BROWSING_CACHE_MAX_ENTRIES=50
             """.trimIndent())
 
             val config = ServerConfig.fromDotEnv(
@@ -82,6 +84,7 @@ class ServerConfigTest {
             assertEquals("file-safe-browsing-key", config.safeBrowsingApiKey)
             assertEquals(900L, config.safeBrowsingTimeoutMillis)
             assertEquals(2, config.safeBrowsingMaxUrls)
+            assertEquals(50, config.safeBrowsingCacheMaxEntries)
         } finally {
             Files.deleteIfExists(path)
         }

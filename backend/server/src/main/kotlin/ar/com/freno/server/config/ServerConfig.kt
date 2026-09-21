@@ -16,6 +16,7 @@ data class ServerConfig(
     val safeBrowsingApiKey: String,
     val safeBrowsingTimeoutMillis: Long,
     val safeBrowsingMaxUrls: Int,
+    val safeBrowsingCacheMaxEntries: Int,
 ) {
     init {
         require(port in 1..65535) { "SERVER_PORT must be between 1 and 65535" }
@@ -26,6 +27,9 @@ data class ServerConfig(
         require(safeBrowsingApiKey.isNotBlank()) { "SAFE_BROWSING_API_KEY is required" }
         require(safeBrowsingTimeoutMillis > 0) { "SAFE_BROWSING_TIMEOUT_MS must be positive" }
         require(safeBrowsingMaxUrls in 1..3) { "SAFE_BROWSING_MAX_URLS must be between 1 and 3" }
+        require(safeBrowsingCacheMaxEntries > 0) {
+            "SAFE_BROWSING_CACHE_MAX_ENTRIES must be positive"
+        }
     }
 
     companion object {
@@ -72,6 +76,8 @@ data class ServerConfig(
                     ?: throw IllegalArgumentException("SAFE_BROWSING_API_KEY is required"),
                 safeBrowsingTimeoutMillis = environment["SAFE_BROWSING_TIMEOUT_MS"]?.toLongOrNull() ?: 1_500,
                 safeBrowsingMaxUrls = environment["SAFE_BROWSING_MAX_URLS"]?.toIntOrNull() ?: 3,
+                safeBrowsingCacheMaxEntries =
+                    environment["SAFE_BROWSING_CACHE_MAX_ENTRIES"]?.toIntOrNull() ?: 100,
             )
     }
 }

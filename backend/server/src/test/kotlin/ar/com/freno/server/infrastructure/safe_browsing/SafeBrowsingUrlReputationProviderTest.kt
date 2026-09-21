@@ -10,6 +10,9 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -19,6 +22,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -193,6 +197,165 @@ class SafeBrowsingUrlReputationProviderTest {
     }
 
     @Test
+    fun `cache duration starts when the Google response is received`() = runBlocking {
+        var requests = 0
+        val clock = MutableClock(Instant.parse("2026-09-21T12:00:00Z"))
+        val matched = """
+            {"matches":[{
+              "threatType":"MALWARE",
+              "platformType":"ANY_PLATFORM",
+              "threatEntryType":"URL",
+              "threat":{"url":"https://malware.example/"},
+              "cacheDuration":"3s"
+            }]}
+        """.trimIndent()
+        val client = HttpClient(MockEngine {
+            requests++
+            clock.advanceSeconds(2)
+            respond(matched, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        })
+        try {
+            val provider = provider(client, clock = clock)
+            provider.assess(listOf("https://malware.example/"))
+
+            clock.advanceSeconds(2)
+            val cached = provider.assess(listOf("https://malware.example/"))
+
+            assertEquals(1, requests)
+            assertEquals(UrlAssessmentStatus.MATCH, cached.status)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun `cached match that expires during a mixed request is not reused`() = runBlocking {
+        var requests = 0
+        val clock = MutableClock(Instant.parse("2026-09-21T12:00:00Z"))
+        val matched = """
+            {"matches":[{
+              "threatType":"MALWARE",
+              "platformType":"ANY_PLATFORM",
+              "threatEntryType":"URL",
+              "threat":{"url":"https://cached.example/"},
+              "cacheDuration":"1s"
+            }]}
+        """.trimIndent()
+        val client = HttpClient(MockEngine {
+            requests++
+            if (requests == 1) {
+                respond(matched, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+            } else {
+                clock.advanceSeconds(2)
+                respond("{}", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+            }
+        })
+        try {
+            val provider = provider(client, clock = clock)
+            provider.assess(listOf("https://cached.example/"))
+
+            val result = provider.assess(
+                listOf("https://cached.example/", "https://uncached.example/"),
+            )
+
+            assertEquals(2, requests)
+            assertEquals(UrlAssessmentStatus.UNAVAILABLE, result.status)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun `concurrent responses preserve all active threat evidence`() = runBlocking {
+        val requests = AtomicInteger()
+        val firstStarted = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        fun response(threatType: String) = """
+            {"matches":[{
+              "threatType":"$threatType",
+              "platformType":"ANY_PLATFORM",
+              "threatEntryType":"URL",
+              "threat":{"url":"https://race.example/"},
+              "cacheDuration":"300s"
+            }]}
+        """.trimIndent()
+        val client = HttpClient(MockEngine {
+            if (requests.incrementAndGet() == 1) {
+                firstStarted.complete(Unit)
+                releaseFirst.await()
+                respond(
+                    response("SOCIAL_ENGINEERING"),
+                    HttpStatusCode.OK,
+                    headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            } else {
+                releaseFirst.complete(Unit)
+                respond(
+                    response("MALWARE"),
+                    HttpStatusCode.OK,
+                    headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            }
+        })
+        try {
+            val provider = provider(client)
+            coroutineScope {
+                val first = async { provider.assess(listOf("https://race.example/")) }
+                firstStarted.await()
+                val second = async { provider.assess(listOf("https://race.example/")) }
+                second.await()
+                first.await()
+            }
+
+            val cached = provider.assess(listOf("https://race.example/"))
+
+            assertEquals(2, requests.get())
+            assertEquals(
+                setOf(UrlThreatType.SOCIAL_ENGINEERING, UrlThreatType.MALWARE),
+                cached.threatTypes.toSet(),
+            )
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun `positive cache evicts its oldest URL at the configured capacity`() = runBlocking {
+        var requests = 0
+        val client = HttpClient(MockEngine { request ->
+            requests++
+            val payload = json.parseToJsonElement((request.body as TextContent).text).jsonObject
+            val url = payload.getValue("threatInfo").jsonObject
+                .getValue("threatEntries").jsonArray.single().jsonObject
+                .getValue("url").jsonPrimitive.content
+            respond(
+                """
+                    {"matches":[{
+                      "threatType":"MALWARE",
+                      "platformType":"ANY_PLATFORM",
+                      "threatEntryType":"URL",
+                      "threat":{"url":"$url"},
+                      "cacheDuration":"300s"
+                    }]}
+                """.trimIndent(),
+                HttpStatusCode.OK,
+                headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        })
+        try {
+            val provider = provider(client, maxCacheEntries = 2)
+            provider.assess(listOf("https://one.example/"))
+            provider.assess(listOf("https://two.example/"))
+            provider.assess(listOf("https://three.example/"))
+            provider.assess(listOf("https://one.example/"))
+
+            assertEquals(4, requests)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
     fun `match with unusable cache duration is reported but not cached`() = runBlocking {
         var requests = 0
         val matched = """
@@ -260,13 +423,15 @@ class SafeBrowsingUrlReputationProviderTest {
     }
 
     @Test
-    fun `configured URL limit is enforced before calling Google`() = runBlocking {
+    fun `configured URL limit is enforced before calling Google`() {
         val client = HttpClient(MockEngine { error("Safe Browsing must not be called") })
         try {
-            assertFailsWith<IllegalArgumentException> {
-                provider(client, maxUrls = 2).assess(
-                    listOf("https://one.example/", "https://two.example/", "https://three.example/"),
-                )
+            runBlocking {
+                assertFailsWith<IllegalArgumentException> {
+                    provider(client, maxUrls = 2).assess(
+                        listOf("https://one.example/", "https://two.example/", "https://three.example/"),
+                    )
+                }
             }
         } finally {
             client.close()
@@ -278,12 +443,14 @@ class SafeBrowsingUrlReputationProviderTest {
         timeoutMillis: Long = 1_500,
         clock: Clock = Clock.systemUTC(),
         maxUrls: Int = 3,
+        maxCacheEntries: Int = 100,
     ) = SafeBrowsingUrlReputationProvider(
         client = client,
         apiKey = "test-safe-browsing-key",
         timeoutMillis = timeoutMillis,
         clock = clock,
         maxUrls = maxUrls,
+        maxCacheEntries = maxCacheEntries,
     )
 }
 
