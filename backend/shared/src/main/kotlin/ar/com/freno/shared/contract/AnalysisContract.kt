@@ -81,6 +81,7 @@ enum class Category {
     FAMILY_IMPERSONATION,
     BANK_PHISHING,
     CODE_REQUEST,
+    URL_THREAT,
     OTHER,
     NONE,
     UNKNOWN,

@@ -77,16 +77,32 @@ solicitud con `400 Bad Request` si excede ese límite o contiene otro esquema.
 Puede omitirse durante la transición del cliente; equivale a `[]`. El servidor
 no abre las URLs en este paso.
 
+Ejemplo con una URL durante el modo de prueba:
+
+```json
+{
+  "eventId": "demo-url",
+  "source": "SMS",
+  "text": "Tu cuenta será suspendida. Entrá al enlace para verificarla.",
+  "contentIncomplete": false,
+  "urls": ["https://banco.example/ingresar"],
+  "locale": "es-AR"
+}
+```
+
+La respuesta mantiene la clasificación `FAKE` anterior, pero usa
+`"urlAssessment":{"status":"UNAVAILABLE","provider":"NONE","threatTypes":[]}`.
+Esto indica que aún no hubo una consulta real de reputación.
+
 ## Valores cerrados
 
 - `source`: `SMS`, `WHATSAPP`.
 - `risk`: `HIGH`, `REVIEW`, `LOW`, `UNKNOWN`.
 - `category`: `FAMILY_IMPERSONATION`, `BANK_PHISHING`, `CODE_REQUEST`,
-  `OTHER`, `NONE`, `UNKNOWN`.
+  `URL_THREAT`, `OTHER`, `NONE`, `UNKNOWN`.
 - `reasonCode`: `NEW_NUMBER_AND_URGENT_PAYMENT`, `CREDENTIAL_REQUEST`,
   `CODE_SHARING_REQUEST`, `INSUFFICIENT_CONTEXT`, `NO_CLEAR_SIGNAL`,
-  `OTHER_SIGNAL`, `ANALYSIS_UNAVAILABLE`.
-  También `URL_LISTED_AS_THREAT` para una futura coincidencia de reputación.
+  `OTHER_SIGNAL`, `ANALYSIS_UNAVAILABLE`, `URL_LISTED_AS_THREAT`.
 - `action`: `VERIFY_KNOWN_CONTACT`, `AVOID_LINK_AND_VERIFY`,
   `DO_NOT_SHARE_CODE`, `NONE`.
 - `analyzer`: `GEMINI`, `UNAVAILABLE`, `FAKE`.
