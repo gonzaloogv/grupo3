@@ -86,12 +86,12 @@ Evaluar con los seis casos de desarrollo, versionar el prompt y documentar ejecu
 
 **Dependencias:** B-04, B-05 y B-06.
 
-- [ ] Registrar esperado/obtenido y comprobar que la justificación describe señales presentes en el mensaje, sin inventar verificaciones.
-- [ ] Probar que instrucciones dentro de una estafa no cambian la política de acciones.
-- [ ] No usar porcentajes de confianza del LLM como garantía.
-- [ ] Documentar GEMINI_API_KEY, GEMINI_MODEL, SAFE_BROWSING_API_KEY, token de demo y arranque sin claves de canales opcionales.
-- [ ] Documentar que Safe Browsing es gratuito para uso no comercial y que una alerta basada en Google requiere su atribución.
-- [ ] No versionar secretos ni registrarlos en logs.
+- [x] Registrar esperado/obtenido y comprobar que la justificación describe señales presentes en el mensaje, sin inventar verificaciones.
+- [x] Probar que instrucciones dentro de una estafa no cambian la política de acciones.
+- [x] No usar porcentajes de confianza del LLM como garantía.
+- [x] Documentar GEMINI_API_KEY, GEMINI_MODEL, SAFE_BROWSING_API_KEY, token de demo y arranque sin claves de canales opcionales.
+- [x] Documentar que Safe Browsing es gratuito para uso no comercial y que una alerta basada en Google requiere su atribución.
+- [x] No versionar secretos ni registrarlos en logs.
 
 ## Orden, hitos y entrega
 
