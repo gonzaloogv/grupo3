@@ -8,7 +8,7 @@ import com.grupo3.freno.model.RiskLevel
 import com.grupo3.freno.capture.CapturedNotification
 import com.grupo3.freno.capture.NotificationPolicy
 import com.grupo3.freno.orchestration.AnalysisRequest
-import com.grupo3.freno.orchestration.FakeRiskAnalyzer
+import com.grupo3.freno.orchestration.HttpRiskAnalyzer
 import com.grupo3.freno.orchestration.RiskAnalyzer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,14 +23,13 @@ import java.util.Locale
 import java.util.UUID
 
 /**
- * Coordinador temporal en memoria. La interfaz es deliberadamente estable para
- * reemplazarlo por Room sin modificar la captura ni los composables.
+ * Coordinador de eventos conectado al backend real mediante HttpRiskAnalyzer.
  */
 object FrenoEventStore {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val analyzer: RiskAnalyzer = FakeRiskAnalyzer()
+    private val analyzer: RiskAnalyzer = HttpRiskAnalyzer()
     private val queue = Channel<CapturedNotification>(capacity = 5)
-    private val _events = MutableStateFlow(seedEvents())
+    private val _events = MutableStateFlow<List<FrenoEvent>>(emptyList())
     val events = _events.asStateFlow()
     private val _activeAlert = MutableStateFlow<FrenoEvent?>(null)
     val activeAlert = _activeAlert.asStateFlow()
