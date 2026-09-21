@@ -2,7 +2,7 @@
 
 **Freno analiza notificaciones en segundo plano, muestra una advertencia visual y guarda un historial que explica por qué clasificó cada mensaje.** No incluye voz; la alarma sonora y el aviso a un familiar son mejoras opcionales.
 
-Stack propuesto: **Kotlin + Android nativo + Jetpack Compose + Room + Ktor + Gemini 3.5 Flash-Lite**. P0 incluye backend, Gemini, alerta visual e historial persistente con justificaciones. Correo será el primer canal externo si sobra tiempo; Telegram solo después del correo.
+Stack propuesto: **Kotlin + Android nativo + Jetpack Compose + Room + Ktor + Gemini 3.5 Flash-Lite + Google Safe Browsing**. P0 combina análisis del texto con reputación de hasta tres URLs, alerta visual e historial persistente con justificaciones. Correo será el primer canal externo si sobra tiempo; Telegram solo después del correo.
 
 Estado: planificación; la aplicación todavía no está implementada. Condiciones: **8 horas, 2 programadores**. Asignar el frente A a quien domina Android/Kotlin.
 
@@ -17,16 +17,16 @@ Estado: planificación; la aplicación todavía no está implementada. Condicion
 ## Features por programador
 
 - [Programador A · Android, interfaz e historial](feat/programador-a-android.md).
-- [Programador B · Backend, Gemini y evaluación; correo y Telegram opcionales](feat/programador-b-ia-backend.md).
+- [Programador B · Backend, Gemini, Safe Browsing y evaluación; correo y Telegram opcionales](feat/programador-b-ia-backend.md).
 
 ## Reparto inicial
 
 | Persona | Responsabilidad | Entrega principal |
 | --- | --- | --- |
 | A | Android, interfaz e historial | Captura, alerta visual, lista/detalle de registros y almacenamiento local |
-| B | Backend, Gemini y evaluación | API, clasificación con justificación, errores y casos de prueba |
+| B | Backend, Gemini, Safe Browsing y evaluación | API, clasificación, reputación de URLs, justificación, errores y casos de prueba |
 
-Hitos: captura y Gemini por separado a la hora 1:30; historial con datos simulados persistentes a la hora 3; integración real entre las horas 3 y 5; congelar P0 a la hora 5. Reservar una hora de pruebas, una de ensayo/entrega y una de buffer.
+Hitos: captura y Gemini por separado a la hora 1:30; Safe Browsing e historial con datos simulados a la hora 3; integración real entre las horas 3 y 5; congelar P0 a la hora 5. Reservar una hora de pruebas, una de ensayo/entrega y una de buffer.
 
 Alcance: una fuente, un teléfono, configuración mínima y 12 casos de evaluación. Al abrir la app se ve el historial; cada detalle muestra el texto redactado, riesgo, justificación y recomendación. La notificación abre la alerta al tocarla. Overlay y alarma sonora quedan opcionales; el historial es obligatorio.
 
