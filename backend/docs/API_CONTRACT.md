@@ -67,8 +67,10 @@ Respuesta cuando Gemini clasifica el mensaje:
 ```
 
 El motivo de `GEMINI` se valida y se redactan identificadores reconocibles
-antes de enviarlos y antes de devolver la explicación. Una respuesta inválida,
-un fallo del proveedor o el vencimiento de `GEMINI_TIMEOUT_MS` produce
+antes de enviarlos y antes de devolver la explicación. Si el motivo contiene
+un enlace, está vacío o supera 25 palabras, el servidor usa una explicación
+local y marca `explanationSource=TEMPLATE`. Una respuesta semánticamente
+incompatible, un fallo del proveedor o el vencimiento de `GEMINI_TIMEOUT_MS` produce
 `risk=UNKNOWN`, `category=UNKNOWN`, `reasonCode=ANALYSIS_UNAVAILABLE`,
 `action=NONE`, `analyzer=UNAVAILABLE`, `model=null`,
 `explanationSource=UNAVAILABLE` y `decisionSources=["LOCAL_POLICY"]`.
@@ -76,10 +78,10 @@ No se presenta como una evaluación de seguridad realizada por Gemini.
 
 `urls` admite hasta tres URLs HTTP(S) absolutas con host. Se rechaza la
 solicitud con `400 Bad Request` si excede ese límite o contiene otro esquema.
-Puede omitirse durante la transición del cliente; equivale a `[]`. El servidor
-no abre las URLs en este paso.
+Puede omitirse; equivale a `[]`. El servidor no abre las URLs: las consulta en
+Safe Browsing al mismo tiempo que Gemini analiza el texto.
 
-Ejemplo con una URL antes de fusionar Google Safe Browsing en B-04:
+Ejemplo con una URL:
 
 ```json
 {
@@ -92,11 +94,16 @@ Ejemplo con una URL antes de fusionar Google Safe Browsing en B-04:
 }
 ```
 
-La respuesta mantiene la clasificación textual de Gemini, pero usa
-`"urlAssessment":{"status":"UNAVAILABLE","provider":"NONE","threatTypes":[]}`.
-Esto indica que la ruta aún no utilizó reputación. B-03 implementa y prueba el
-adaptador de Google, pero B-04 será responsable de ejecutarlo junto con Gemini
-y construir la decisión final.
+La fusión aplica estas reglas:
+
+- `MATCH` de `MALWARE` o `SOCIAL_ENGINEERING` fuerza `HIGH`, `URL_THREAT`,
+  `URL_LISTED_AS_THREAT` y `AVOID_LINK_AND_VERIFY`, incluso si Gemini falla.
+- `NO_MATCH` solo significa «no reportada» y nunca reduce el riesgo de Gemini.
+- Con URL, `UNAVAILABLE` convierte un `LOW` textual en `UNKNOWN`; conserva
+  `HIGH` o `REVIEW`.
+- `contentIncomplete=true` también convierte un `LOW` en `UNKNOWN`.
+- Un resultado incompatible, como `HIGH` con `action=NONE`, se degrada a
+  `UNKNOWN` y no ordena una intervención.
 
 El analizador determinístico `FAKE` solo se usa en pruebas del servidor;
 nunca debe mostrarse como una clasificación real al usuario.

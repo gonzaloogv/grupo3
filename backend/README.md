@@ -1,9 +1,9 @@
 # Backend de Freno
 
-Frente B: contrato compartido, API Ktor, clasificación con Gemini y adaptador
-de reputación de URLs con Google Safe Browsing. La fusión de ambas señales y
-la evaluación se implementan en ramas posteriores y se integran a `develop`
-por feature.
+Frente B: contrato compartido, API Ktor, clasificación con Gemini, reputación
+de URLs con Google Safe Browsing y fusión conservadora de ambas señales. La
+evaluación se implementa en ramas posteriores y se integra a `develop` por
+feature.
 
 ## Convenciones base
 
@@ -82,6 +82,8 @@ El adaptador de Safe Browsing usa `POST /v4/threatMatches:find`, consulta como
 máximo `SAFE_BROWSING_MAX_URLS`, omite la red cuando no hay URLs y limita cada
 consulta con `SAFE_BROWSING_TIMEOUT_MS`. Conserva coincidencias positivas solo
 durante el `cacheDuration` indicado por Google y limita la caché con
-`SAFE_BROWSING_CACHE_MAX_ENTRIES`. La integración con el resultado
-final de `/v1/analyze` corresponde a B-04. Safe Browsing es para uso no
-comercial; un producto comercial debe evaluar Web Risk.
+`SAFE_BROWSING_CACHE_MAX_ENTRIES`. `/v1/analyze` ejecuta la clasificación y la
+reputación en paralelo: una coincidencia fuerza `HIGH`; una ausencia de
+coincidencia no reduce a Gemini; y una reputación no disponible impide devolver
+`LOW` para mensajes con URL. Safe Browsing es para uso no comercial; un
+producto comercial debe evaluar Web Risk.

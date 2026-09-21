@@ -5,6 +5,8 @@ import ar.com.freno.shared.contract.Analyzer
 import ar.com.freno.shared.contract.DecisionSource
 import ar.com.freno.shared.contract.ExplanationSource
 import ar.com.freno.shared.contract.NotificationSource
+import ar.com.freno.shared.contract.Category
+import ar.com.freno.shared.contract.Action
 import ar.com.freno.shared.contract.ReasonCode
 import ar.com.freno.shared.contract.Risk
 import ar.com.freno.shared.contract.UrlAssessmentStatus
@@ -87,6 +89,32 @@ class GeminiRiskAnalyzerTest {
     }
 
     @Test
+    fun `Gemini returns its low text classification without preempting URL fusion`() = runBlocking {
+        val lowResponse = successfulResponse
+            .replace("\\\"HIGH\\\"", "\\\"LOW\\\"")
+            .replace("\\\"FAMILY_IMPERSONATION\\\"", "\\\"NONE\\\"")
+            .replace("\\\"NEW_NUMBER_AND_URGENT_PAYMENT\\\"", "\\\"NO_CLEAR_SIGNAL\\\"")
+            .replace("El mensaje dice que cambió de número y pide una transferencia urgente.",
+                "No se observan señales claras en el texto disponible.")
+            .replace("\\\"VERIFY_KNOWN_CONTACT\\\"", "\\\"NONE\\\"")
+        val client = HttpClient(MockEngine {
+            respond(lowResponse, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        })
+        try {
+            val result = analyzer(client).analyze(
+                request("Mensaje cotidiano.").copy(urls = listOf("https://ordinary.example/")),
+            )
+
+            assertEquals(Risk.LOW, result.risk)
+            assertEquals(Category.NONE, result.category)
+            assertEquals(Action.NONE, result.action)
+            assertEquals(UrlAssessmentStatus.NO_URL, result.urlAssessment.status)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
     fun `sensitive identifiers are removed before sending text to Gemini`() = runBlocking {
         val message = "Compartí el código 123456. Llamá al +54 11 1234 5678 y transferí al alias pedro.ahorro. Entrá a https://banco.example/verify?token=secreto&id=123."
         var sentData = ""
@@ -138,6 +166,27 @@ class GeminiRiskAnalyzerTest {
             assertEquals(Risk.HIGH, result.risk)
             assertFalse(result.reasonSimple.contains("pedro.ahorro"))
             assertTrue(result.reasonSimple.contains("[ALIAS]"))
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun `model explanation with a link uses a local template`() = runBlocking {
+        val response = successfulResponse.replace(
+            "El mensaje dice que cambió de número y pide una transferencia urgente.",
+            "El mensaje dice que cambió de número y pide una transferencia urgente; revisá https://malicious.example.",
+        )
+        val client = HttpClient(MockEngine {
+            respond(response, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        })
+        try {
+            val result = analyzer(client).analyze(request("Soy tu hijo, cambié de número. Transferime urgente."))
+
+            assertEquals(Risk.HIGH, result.risk)
+            assertEquals(ExplanationSource.TEMPLATE, result.explanationSource)
+            assertEquals(listOf(DecisionSource.GEMINI, DecisionSource.LOCAL_POLICY), result.decisionSources)
+            assertFalse(result.reasonSimple.contains("http"))
         } finally {
             client.close()
         }

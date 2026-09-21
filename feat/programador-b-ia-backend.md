@@ -51,11 +51,11 @@ Ejecutar Gemini y Safe Browsing en paralelo y aplicar la decisión final en Kotl
 
 **Dependencias:** B-02 y B-03.
 
-- [ ] MATCH de SOCIAL_ENGINEERING o MALWARE fuerza HIGH, URL_THREAT, URL_LISTED_AS_THREAT y AVOID_LINK_AND_VERIFY, incluso si Gemini falla.
-- [ ] NO_MATCH no reduce el riesgo devuelto por Gemini.
-- [ ] Con URL, Safe Browsing UNAVAILABLE o `contentIncomplete=true` y Gemini LOW, devolver UNKNOWN; conservar HIGH o REVIEW de Gemini.
-- [ ] Una explicación larga o con enlaces usa TEMPLATE; un fallo técnico usa UNAVAILABLE y nunca se atribuye al proveedor incorrecto.
-- [ ] HIGH con action NONE u otros campos incompatibles no produce una intervención basada en datos inválidos.
+- [x] MATCH de SOCIAL_ENGINEERING o MALWARE fuerza HIGH, URL_THREAT, URL_LISTED_AS_THREAT y AVOID_LINK_AND_VERIFY, incluso si Gemini falla.
+- [x] NO_MATCH no reduce el riesgo devuelto por Gemini.
+- [x] Con URL, Safe Browsing UNAVAILABLE o `contentIncomplete=true` y Gemini LOW, devolver UNKNOWN; conservar HIGH o REVIEW de Gemini.
+- [x] Una explicación larga o con enlaces usa TEMPLATE; un fallo técnico usa UNAVAILABLE y nunca se atribuye al proveedor incorrecto.
+- [x] HIGH con action NONE u otros campos incompatibles no produce una intervención basada en datos inválidos.
 
 ## B-05 · Corpus sintético y fixtures de reputación · 30 min
 

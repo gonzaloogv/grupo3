@@ -1,9 +1,11 @@
 package ar.com.freno.server
 
+import ar.com.freno.server.application.ConservativeRiskAnalyzer
 import ar.com.freno.server.api.configureRoutes
 import ar.com.freno.server.application.GeminiRiskAnalyzer
 import ar.com.freno.server.application.RiskAnalyzer
 import ar.com.freno.server.config.ServerConfig
+import ar.com.freno.server.infrastructure.safe_browsing.SafeBrowsingUrlReputationProvider
 import ar.com.freno.server.plugins.configureSecurity
 import ar.com.freno.server.plugins.configureSerialization
 import io.ktor.server.application.Application
@@ -29,13 +31,26 @@ fun main() {
             host = config.host,
             port = config.port,
         ) {
-            module(config, GeminiRiskAnalyzer(
-                client = client,
-                apiKey = config.geminiApiKey,
-                model = config.geminiModel,
-                promptVersion = config.promptVersion,
-                timeoutMillis = config.geminiTimeoutMillis,
-            ))
+            module(
+                config,
+                ConservativeRiskAnalyzer(
+                    textAnalyzer = GeminiRiskAnalyzer(
+                        client = client,
+                        apiKey = config.geminiApiKey,
+                        model = config.geminiModel,
+                        promptVersion = config.promptVersion,
+                        timeoutMillis = config.geminiTimeoutMillis,
+                    ),
+                    urlReputationProvider = SafeBrowsingUrlReputationProvider(
+                        client = client,
+                        apiKey = config.safeBrowsingApiKey,
+                        timeoutMillis = config.safeBrowsingTimeoutMillis,
+                        maxUrls = config.safeBrowsingMaxUrls,
+                        maxCacheEntries = config.safeBrowsingCacheMaxEntries,
+                    ),
+                    promptVersion = config.promptVersion,
+                ),
+            )
         }.start(wait = true)
     } finally {
         client.close()

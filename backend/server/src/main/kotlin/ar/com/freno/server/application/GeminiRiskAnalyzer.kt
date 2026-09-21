@@ -53,29 +53,33 @@ class GeminiRiskAnalyzer(
     override suspend fun analyze(input: AnalysisRequest): AnalysisResult {
         val start = System.nanoTime()
         return try {
-            val result = withTimeout(timeoutMillis) { requestClassification(input) }
-            if (input.urls.isNotEmpty() && result.risk == Risk.LOW || input.contentIncomplete && result.risk == Risk.LOW) {
-                val fallback = unavailable(input)
-                log(input.eventId, fallback.risk, start, "URL_OR_CONTENT_UNAVAILABLE")
-                fallback
-            } else {
-                val normalized = AnalysisResult(
-                    eventId = input.eventId,
-                    risk = result.risk,
-                    category = result.category,
-                    reasonCode = result.reasonCode,
-                    reasonSimple = result.reasonSimple.trim(),
-                    action = result.action,
-                    analyzer = Analyzer.GEMINI,
-                    model = model,
-                    promptVersion = promptVersion,
-                    explanationSource = ExplanationSource.GEMINI,
-                    decisionSources = listOf(DecisionSource.GEMINI),
-                    urlAssessment = urlAssessment(input),
-                )
-                log(input.eventId, normalized.risk, start, null)
-                normalized
-            }
+            val validated = withTimeout(timeoutMillis) { requestClassification(input) }
+            val result = validated.classification
+            val usesTemplate = validated.usesTemplate
+            val normalized = AnalysisResult(
+                eventId = input.eventId,
+                risk = result.risk,
+                category = result.category,
+                reasonCode = result.reasonCode,
+                reasonSimple = if (usesTemplate) {
+                    ExplanationTemplates.forReasonCode(result.reasonCode)
+                } else {
+                    result.reasonSimple.trim()
+                },
+                action = result.action,
+                analyzer = Analyzer.GEMINI,
+                model = model,
+                promptVersion = promptVersion,
+                explanationSource = if (usesTemplate) ExplanationSource.TEMPLATE else ExplanationSource.GEMINI,
+                decisionSources = if (usesTemplate) {
+                    listOf(DecisionSource.GEMINI, DecisionSource.LOCAL_POLICY)
+                } else {
+                    listOf(DecisionSource.GEMINI)
+                },
+                urlAssessment = textOnlyAssessment(),
+            )
+            log(input.eventId, normalized.risk, start, null)
+            normalized
         } catch (error: CancellationException) {
             if (error !is TimeoutCancellationException) throw error
             val fallback = unavailable(input)
@@ -88,7 +92,7 @@ class GeminiRiskAnalyzer(
         }
     }
 
-    private suspend fun requestClassification(input: AnalysisRequest): ModelClassification {
+    private suspend fun requestClassification(input: AnalysisRequest): ValidatedClassification {
         val response = client.post("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent") {
             header("x-goog-api-key", apiKey)
             contentType(ContentType.Application.Json)
@@ -105,13 +109,14 @@ class GeminiRiskAnalyzer(
         val modelText = candidate.getValue("content").jsonObject.getValue("parts").jsonArray.first()
             .jsonObject.getValue("text").jsonPrimitive.content
         val classification = json.decodeFromString<ModelClassification>(modelText)
+        val usesTemplate = !ExplanationTemplates.isSafe(classification.reasonSimple)
         val safeClassification = classification.copy(
             reasonSimple = SensitiveDataRedactor.redact(classification.reasonSimple),
         )
         require(safeClassification.isValidFor(SensitiveDataRedactor.redact(input.text))) {
             "Invalid Gemini classification"
         }
-        return safeClassification
+        return ValidatedClassification(safeClassification, usesTemplate)
     }
 
     private fun requestBody(input: AnalysisRequest) = buildJsonObject {
@@ -170,11 +175,11 @@ class GeminiRiskAnalyzer(
         promptVersion = promptVersion,
         explanationSource = ExplanationSource.UNAVAILABLE,
         decisionSources = listOf(DecisionSource.LOCAL_POLICY),
-        urlAssessment = urlAssessment(input),
+        urlAssessment = textOnlyAssessment(),
     )
 
-    private fun urlAssessment(input: AnalysisRequest) = UrlAssessment(
-        status = if (input.urls.isEmpty()) UrlAssessmentStatus.NO_URL else UrlAssessmentStatus.UNAVAILABLE,
+    private fun textOnlyAssessment() = UrlAssessment(
+        status = UrlAssessmentStatus.NO_URL,
         provider = UrlAssessmentProvider.NONE,
         threatTypes = emptyList(),
     )
@@ -201,6 +206,11 @@ class GeminiRiskAnalyzer(
     }
 }
 
+private data class ValidatedClassification(
+    val classification: ModelClassification,
+    val usesTemplate: Boolean,
+)
+
 @Serializable
 private data class ModelClassification(
     val risk: Risk,
@@ -211,8 +221,6 @@ private data class ModelClassification(
 ) {
     fun isValidFor(message: String): Boolean {
         val reason = reasonSimple.trim()
-        if (reason.isEmpty() || reason.split(Regex("\\s+")).size > 25) return false
-        if (Regex("(?i)https?://|www\\.").containsMatchIn(reason)) return false
         if (category == Category.URL_THREAT || reasonCode in setOf(
                 ReasonCode.URL_LISTED_AS_THREAT, ReasonCode.ANALYSIS_UNAVAILABLE,
             )) return false
@@ -224,7 +232,7 @@ private data class ModelClassification(
             Risk.UNKNOWN -> if (category != Category.UNKNOWN || reasonCode != ReasonCode.INSUFFICIENT_CONTEXT || action != Action.NONE) return false
             Risk.REVIEW -> if (category in setOf(Category.NONE, Category.UNKNOWN) || reasonCode == ReasonCode.NO_CLEAR_SIGNAL) return false
         }
-        if (risk in setOf(Risk.HIGH, Risk.REVIEW)) {
+        if (risk in setOf(Risk.HIGH, Risk.REVIEW) && ExplanationTemplates.isSafe(reason)) {
             val consistent = when (category) {
                 Category.FAMILY_IMPERSONATION -> reasonCode in setOf(
                     ReasonCode.NEW_NUMBER_AND_URGENT_PAYMENT, ReasonCode.INSUFFICIENT_CONTEXT,
