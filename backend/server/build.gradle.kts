@@ -27,3 +27,18 @@ dependencies {
 application {
     mainClass.set("ar.com.freno.server.ApplicationKt")
 }
+
+tasks.named<JavaExec>("run") {
+    workingDir(rootProject.projectDir)
+    args(providers.gradleProperty("envFile").orElse(".env").get())
+}
+
+tasks.register<JavaExec>("evaluateDevelopment") {
+    group = "verification"
+    description = "Evaluate six development cases and one injection using live Gemini and reputation fixtures."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("ar.com.freno.server.evaluation.DevelopmentEvaluationKt")
+    workingDir(rootProject.projectDir)
+    args(providers.gradleProperty("envFile").orElse(".env").get(),
+        providers.gradleProperty("evaluationRevision").orElse("UNRECORDED").get())
+}

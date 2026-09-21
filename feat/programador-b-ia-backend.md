@@ -63,10 +63,10 @@ Preparar **12 casos**: 6 con señales de engaño, 4 cotidianos y 2 ambiguos. Agr
 
 **Dependencia:** arranque; puede avanzarse sin esperar Android.
 
-- [ ] Incluir suplantación bancaria, familiar y pedido de códigos; al menos dos mensajes contienen enlaces sintéticos `.example`.
-- [ ] Cubrir MATCH, NO_MATCH, UNAVAILABLE y mensaje sin URL mediante el proveedor simulado.
-- [ ] Compartir casos de desarrollo para integración y conservar los reservados para el cierre.
-- [ ] No usar resultados reservados para ajustar el prompt ni presentar esta muestra como precisión real.
+- [x] Incluir suplantación bancaria, familiar y pedido de códigos; al menos dos mensajes contienen enlaces sintéticos `.example`.
+- [x] Cubrir MATCH, NO_MATCH, UNAVAILABLE y mensaje sin URL mediante el proveedor simulado.
+- [x] Compartir casos de desarrollo para integración y conservar los reservados para el cierre.
+- [x] No usar resultados reservados para ajustar el prompt ni presentar esta muestra como precisión real.
 
 ## B-06 · Integración Android, caché y límites · 45 min
 
@@ -74,11 +74,11 @@ Probar con A el recorrido real, los cuatro niveles de riesgo y los estados de re
 
 **Dependencias:** B-01 a B-04 y A-06 para el ensayo conjunto.
 
-- [ ] Un evento vuelve con eventId, justificación y urlAssessment correctos, y actualiza la fila correspondiente.
-- [ ] Repetir un análisis completado reutiliza el resultado sin otra llamada a Gemini o Safe Browsing.
-- [ ] Mismo eventId con texto distinto se rechaza, sin devolver una clasificación ajena.
-- [ ] Rechazar cuerpos mayores a 8 KB y texto superior a 2.000 caracteres.
-- [ ] La alerta funciona sin correo/Telegram y abrir el historial no consulta nuevamente ningún proveedor.
+- [x] Un evento vuelve con eventId, justificación y urlAssessment correctos, y actualiza la fila correspondiente.
+- [x] Repetir un análisis completado reutiliza el resultado sin otra llamada a Gemini o Safe Browsing, excepto MATCH: se reevalúa para no extender el cacheDuration de Google mediante la caché de análisis.
+- [x] Mismo eventId con texto distinto se rechaza, sin devolver una clasificación ajena.
+- [x] Rechazar cuerpos mayores a 8 KB y texto superior a 2.000 caracteres.
+- [x] La alerta funciona sin correo/Telegram y abrir el historial no consulta nuevamente ningún proveedor.
 
 ## B-07 · Evaluación inicial y ejecución reproducible · 60 min
 
@@ -86,12 +86,12 @@ Evaluar con los seis casos de desarrollo, versionar el prompt y documentar ejecu
 
 **Dependencias:** B-04, B-05 y B-06.
 
-- [ ] Registrar esperado/obtenido y comprobar que la justificación describe señales presentes en el mensaje, sin inventar verificaciones.
-- [ ] Probar que instrucciones dentro de una estafa no cambian la política de acciones.
-- [ ] No usar porcentajes de confianza del LLM como garantía.
-- [ ] Documentar GEMINI_API_KEY, GEMINI_MODEL, SAFE_BROWSING_API_KEY, token de demo y arranque sin claves de canales opcionales.
-- [ ] Documentar que Safe Browsing es gratuito para uso no comercial y que una alerta basada en Google requiere su atribución.
-- [ ] No versionar secretos ni registrarlos en logs.
+- [x] Registrar esperado/obtenido y comprobar que la justificación describe señales presentes en el mensaje, sin inventar verificaciones.
+- [x] Probar que instrucciones dentro de una estafa no cambian la política de acciones.
+- [x] No usar porcentajes de confianza del LLM como garantía.
+- [x] Documentar GEMINI_API_KEY, GEMINI_MODEL, SAFE_BROWSING_API_KEY, token de demo y arranque sin claves de canales opcionales.
+- [x] Documentar que Safe Browsing es gratuito para uso no comercial y que una alerta basada en Google requiere su atribución.
+- [x] No versionar secretos ni registrarlos en logs.
 
 ## Orden, hitos y entrega
 

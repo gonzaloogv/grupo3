@@ -18,6 +18,10 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.async
+import io.ktor.http.content.OutgoingContent
+import io.ktor.utils.io.ByteWriteChannel
+import io.ktor.utils.io.writeFully
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -122,6 +126,176 @@ class ApplicationTest {
         }
         assertEquals(HttpStatusCode.BadRequest, response.status)
         assertEquals(0, analyzerCalls)
+    }
+
+    @Test
+    fun `repeating an analysis with same eventId and text reuses cached result without second analyzer call`() = testApplication {
+        var analyzerCalls = 0
+        application {
+            module(testConfig(), RiskAnalyzer {
+                analyzerCalls++
+                FakeRiskAnalyzer().analyze(it)
+            })
+        }
+
+        val firstResponse = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            contentType(ContentType.Application.Json)
+            setBody(validRequestBody())
+        }
+        assertEquals(HttpStatusCode.OK, firstResponse.status)
+        assertEquals(1, analyzerCalls)
+
+        val secondResponse = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            contentType(ContentType.Application.Json)
+            setBody(validRequestBody())
+        }
+        assertEquals(HttpStatusCode.OK, secondResponse.status)
+        assertEquals(1, analyzerCalls)
+        val firstResult = json.decodeFromString<AnalysisResult>(firstResponse.bodyAsText())
+        val secondResult = json.decodeFromString<AnalysisResult>(secondResponse.bodyAsText())
+        assertEquals(firstResult, secondResult)
+    }
+
+    @Test
+    fun `repeating an analysis with same eventId and different text returns 409 conflict`() = testApplication {
+        var analyzerCalls = 0
+        application {
+            module(testConfig(), RiskAnalyzer {
+                analyzerCalls++
+                FakeRiskAnalyzer().analyze(it)
+            })
+        }
+
+        val firstResponse = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            contentType(ContentType.Application.Json)
+            setBody(validRequestBody())
+        }
+        assertEquals(HttpStatusCode.OK, firstResponse.status)
+        assertEquals(1, analyzerCalls)
+
+        val conflictingBody = validRequestBody().replace("Soy tu hijo", "Texto completamente distinto")
+        val secondResponse = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            contentType(ContentType.Application.Json)
+            setBody(conflictingBody)
+        }
+        assertEquals(HttpStatusCode.Conflict, secondResponse.status)
+        assertEquals(1, analyzerCalls)
+    }
+
+    @Test
+    fun `analyze rejects request body exceeding 8 KB with 413 payload too large`() = testApplication {
+        var analyzerCalls = 0
+        application {
+            module(testConfig(), RiskAnalyzer {
+                analyzerCalls++
+                FakeRiskAnalyzer().analyze(it)
+            })
+        }
+
+        val oversizedPadding = "A".repeat(9 * 1024)
+        val response = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            contentType(ContentType.Application.Json)
+            setBody("""{"eventId":"demo-001","source":"SMS","text":"$oversizedPadding","contentIncomplete":false,"locale":"es-AR"}""")
+        }
+        assertEquals(HttpStatusCode.PayloadTooLarge, response.status)
+        assertEquals(0, analyzerCalls)
+    }
+
+    @Test
+    fun `analyze rejects text exceeding 2000 characters with 400 bad request`() = testApplication {
+        var analyzerCalls = 0
+        application {
+            module(testConfig(), RiskAnalyzer {
+                analyzerCalls++
+                FakeRiskAnalyzer().analyze(it)
+            })
+        }
+
+        val longText = "A".repeat(2001)
+        val response = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            contentType(ContentType.Application.Json)
+            setBody("""{"eventId":"demo-001","source":"SMS","text":"$longText","contentIncomplete":false,"locale":"es-AR"}""")
+        }
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertEquals(0, analyzerCalls)
+    }
+
+    @Test
+    fun `same event with changed metadata or urls conflicts`() = testApplication {
+        application { module(testConfig(), FakeRiskAnalyzer()) }
+        val original = validRequestBody()
+        suspend fun send(body: String) = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }
+        assertEquals(HttpStatusCode.OK, send(original).status)
+        for (changed in listOf(
+            original.replace("\"locale\"", "\"urls\":[\"https://evil.example\"],\"locale\""),
+            original.replace("false", "true"),
+            original.replace("SMS", "WHATSAPP"),
+            original.replace("es-AR", "es-MX"),
+        )) assertEquals(HttpStatusCode.Conflict, send(changed).status)
+    }
+
+    @Test
+    fun `malformed URI returns bad request instead of server error`() = testApplication {
+        application { module(testConfig(), FakeRiskAnalyzer()) }
+        val response = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            contentType(ContentType.Application.Json)
+            setBody(validRequestBody().replace("\"locale\"", "\"urls\":[\"https://bad host.example\"],\"locale\""))
+        }
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+    }
+
+    @Test
+    fun `concurrent duplicate requests only invoke analyzer once`() = testApplication {
+        val calls = java.util.concurrent.atomic.AtomicInteger()
+        application { module(testConfig(), RiskAnalyzer {
+            calls.incrementAndGet()
+            kotlinx.coroutines.delay(100)
+            FakeRiskAnalyzer().analyze(it)
+        }) }
+        kotlinx.coroutines.coroutineScope {
+            val requests = (1..8).map {
+                async {
+                    client.post("/v1/analyze") {
+                        bearerAuth(demoToken)
+                        contentType(ContentType.Application.Json)
+                        setBody(validRequestBody())
+                    }.status
+                }
+            }
+            requests.forEach { assertEquals(HttpStatusCode.OK, it.await()) }
+        }
+        assertEquals(1, calls.get())
+    }
+
+    @Test
+    fun `oversized streaming body without content length is rejected`() = testApplication {
+        var calls = 0
+        application { module(testConfig(), RiskAnalyzer {
+            calls++
+            FakeRiskAnalyzer().analyze(it)
+        }) }
+        val response = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            setBody(object : OutgoingContent.WriteChannelContent() {
+                override val contentType = ContentType.Application.Json
+                override suspend fun writeTo(channel: ByteWriteChannel) {
+                    channel.writeFully(ByteArray(8193) { 32 })
+                }
+            })
+        }
+        assertEquals(HttpStatusCode.PayloadTooLarge, response.status)
+        assertEquals(0, calls)
     }
 
     private fun testConfig() = ServerConfig(

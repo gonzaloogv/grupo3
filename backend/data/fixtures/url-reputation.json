@@ -1,0 +1,50 @@
+[
+  {
+    "id": "match-social-engineering",
+    "inputUrls": [
+      "https://banco-alerta.example/login",
+      "https://reactivacion-cuenta.example/token"
+    ],
+    "status": "MATCH",
+    "provider": "GOOGLE_SAFE_BROWSING",
+    "threatTypes": [
+      "SOCIAL_ENGINEERING"
+    ]
+  },
+  {
+    "id": "match-malware",
+    "inputUrls": [
+      "https://descarga-segura.example/instalador"
+    ],
+    "status": "MATCH",
+    "provider": "GOOGLE_SAFE_BROWSING",
+    "threatTypes": [
+      "MALWARE"
+    ]
+  },
+  {
+    "id": "no-match-url",
+    "inputUrls": [
+      "https://portal-seguro.example/ayuda"
+    ],
+    "status": "NO_MATCH",
+    "provider": "GOOGLE_SAFE_BROWSING",
+    "threatTypes": []
+  },
+  {
+    "id": "unavailable-url",
+    "inputUrls": [
+      "https://servicio-verificacion.example/alerta"
+    ],
+    "status": "UNAVAILABLE",
+    "provider": "GOOGLE_SAFE_BROWSING",
+    "threatTypes": []
+  },
+  {
+    "id": "no-url",
+    "inputUrls": [],
+    "status": "NO_URL",
+    "provider": "NONE",
+    "threatTypes": []
+  }
+]
