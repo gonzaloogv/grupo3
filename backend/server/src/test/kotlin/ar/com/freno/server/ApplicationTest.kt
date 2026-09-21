@@ -124,6 +124,104 @@ class ApplicationTest {
         assertEquals(0, analyzerCalls)
     }
 
+    @Test
+    fun `repeating an analysis with same eventId and text reuses cached result without second analyzer call`() = testApplication {
+        var analyzerCalls = 0
+        application {
+            module(testConfig(), RiskAnalyzer {
+                analyzerCalls++
+                FakeRiskAnalyzer().analyze(it)
+            })
+        }
+
+        val firstResponse = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            contentType(ContentType.Application.Json)
+            setBody(validRequestBody())
+        }
+        assertEquals(HttpStatusCode.OK, firstResponse.status)
+        assertEquals(1, analyzerCalls)
+
+        val secondResponse = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            contentType(ContentType.Application.Json)
+            setBody(validRequestBody())
+        }
+        assertEquals(HttpStatusCode.OK, secondResponse.status)
+        assertEquals(1, analyzerCalls)
+        val firstResult = json.decodeFromString<AnalysisResult>(firstResponse.bodyAsText())
+        val secondResult = json.decodeFromString<AnalysisResult>(secondResponse.bodyAsText())
+        assertEquals(firstResult, secondResult)
+    }
+
+    @Test
+    fun `repeating an analysis with same eventId and different text returns 409 conflict`() = testApplication {
+        var analyzerCalls = 0
+        application {
+            module(testConfig(), RiskAnalyzer {
+                analyzerCalls++
+                FakeRiskAnalyzer().analyze(it)
+            })
+        }
+
+        val firstResponse = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            contentType(ContentType.Application.Json)
+            setBody(validRequestBody())
+        }
+        assertEquals(HttpStatusCode.OK, firstResponse.status)
+        assertEquals(1, analyzerCalls)
+
+        val conflictingBody = validRequestBody().replace("Soy tu hijo", "Texto completamente distinto")
+        val secondResponse = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            contentType(ContentType.Application.Json)
+            setBody(conflictingBody)
+        }
+        assertEquals(HttpStatusCode.Conflict, secondResponse.status)
+        assertEquals(1, analyzerCalls)
+    }
+
+    @Test
+    fun `analyze rejects request body exceeding 8 KB with 413 payload too large`() = testApplication {
+        var analyzerCalls = 0
+        application {
+            module(testConfig(), RiskAnalyzer {
+                analyzerCalls++
+                FakeRiskAnalyzer().analyze(it)
+            })
+        }
+
+        val oversizedPadding = "A".repeat(9 * 1024)
+        val response = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            contentType(ContentType.Application.Json)
+            setBody("""{"eventId":"demo-001","source":"SMS","text":"$oversizedPadding","contentIncomplete":false,"locale":"es-AR"}""")
+        }
+        assertEquals(HttpStatusCode.PayloadTooLarge, response.status)
+        assertEquals(0, analyzerCalls)
+    }
+
+    @Test
+    fun `analyze rejects text exceeding 2000 characters with 400 bad request`() = testApplication {
+        var analyzerCalls = 0
+        application {
+            module(testConfig(), RiskAnalyzer {
+                analyzerCalls++
+                FakeRiskAnalyzer().analyze(it)
+            })
+        }
+
+        val longText = "A".repeat(2001)
+        val response = client.post("/v1/analyze") {
+            bearerAuth(demoToken)
+            contentType(ContentType.Application.Json)
+            setBody("""{"eventId":"demo-001","source":"SMS","text":"$longText","contentIncomplete":false,"locale":"es-AR"}""")
+        }
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertEquals(0, analyzerCalls)
+    }
+
     private fun testConfig() = ServerConfig(
         host = "127.0.0.1",
         port = 8080,

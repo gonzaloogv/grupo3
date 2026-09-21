@@ -17,6 +17,8 @@ data class ServerConfig(
     val safeBrowsingTimeoutMillis: Long,
     val safeBrowsingMaxUrls: Int,
     val safeBrowsingCacheMaxEntries: Int,
+    val analysisCacheTtlMinutes: Long = 15,
+    val analysisCacheMaxEntries: Int = 100,
 ) {
     init {
         require(port in 1..65535) { "SERVER_PORT must be between 1 and 65535" }
@@ -30,6 +32,8 @@ data class ServerConfig(
         require(safeBrowsingCacheMaxEntries > 0) {
             "SAFE_BROWSING_CACHE_MAX_ENTRIES must be positive"
         }
+        require(analysisCacheTtlMinutes > 0) { "ANALYSIS_CACHE_TTL_MINUTES must be positive" }
+        require(analysisCacheMaxEntries > 0) { "ANALYSIS_CACHE_MAX_ENTRIES must be positive" }
     }
 
     companion object {
@@ -78,6 +82,10 @@ data class ServerConfig(
                 safeBrowsingMaxUrls = environment["SAFE_BROWSING_MAX_URLS"]?.toIntOrNull() ?: 3,
                 safeBrowsingCacheMaxEntries =
                     environment["SAFE_BROWSING_CACHE_MAX_ENTRIES"]?.toIntOrNull() ?: 100,
+                analysisCacheTtlMinutes =
+                    environment["ANALYSIS_CACHE_TTL_MINUTES"]?.toLongOrNull() ?: 15,
+                analysisCacheMaxEntries =
+                    environment["ANALYSIS_CACHE_MAX_ENTRIES"]?.toIntOrNull() ?: 100,
             )
     }
 }

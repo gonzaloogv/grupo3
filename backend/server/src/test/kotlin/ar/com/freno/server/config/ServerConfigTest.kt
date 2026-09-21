@@ -34,6 +34,8 @@ class ServerConfigTest {
         assertEquals(1_500L, config.safeBrowsingTimeoutMillis)
         assertEquals(3, config.safeBrowsingMaxUrls)
         assertEquals(100, config.safeBrowsingCacheMaxEntries)
+        assertEquals(15L, config.analysisCacheTtlMinutes)
+        assertEquals(100, config.analysisCacheMaxEntries)
     }
 
     @Test

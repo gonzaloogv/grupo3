@@ -81,6 +81,14 @@ solicitud con `400 Bad Request` si excede ese límite o contiene otro esquema.
 Puede omitirse; equivale a `[]`. El servidor no abre las URLs: las consulta en
 Safe Browsing al mismo tiempo que Gemini analiza el texto.
 
+## Límites y Caché de Análisis
+
+- **Tamaño del cuerpo**: El cuerpo JSON de la solicitud no puede superar los 8 KB (8.192 bytes). Peticiones que superen este tamaño se rechazan con `413 Payload Too Large`.
+- **Longitud del texto**: `text` no puede superar los 2.000 caracteres. Peticiones con textos mayores se rechazan con `400 Bad Request`.
+- **Caché de resultados**: El servidor retiene hasta 100 resultados de análisis durante 15 minutos (`ANALYSIS_CACHE_MAX_ENTRIES` y `ANALYSIS_CACHE_TTL_MINUTES`).
+- **Reutilización por `eventId`**: Consultas repetidas con el mismo `eventId` y mismo texto devuelven la respuesta en caché sin invocar nuevamente a Gemini ni a Safe Browsing.
+- **Detección de colisión**: Si se recibe una petición con un `eventId` activo pero con texto distinto, el servidor rechaza la solicitud con `409 Conflict` para evitar devolver clasificaciones ajenas o permitir suplantaciones de identificadores.
+
 Ejemplo con una URL:
 
 ```json
