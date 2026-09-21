@@ -1,0 +1,542 @@
+package com.grupo3.freno.ui
+
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.grupo3.freno.data.FrenoEventStore
+import com.grupo3.freno.model.FrenoEvent
+import com.grupo3.freno.ui.theme.Border
+import com.grupo3.freno.ui.theme.Canvas
+import com.grupo3.freno.ui.theme.Danger
+import com.grupo3.freno.ui.theme.DangerSoft
+import com.grupo3.freno.ui.theme.Ink
+import com.grupo3.freno.ui.theme.InkMuted
+import com.grupo3.freno.ui.theme.Safe
+import com.grupo3.freno.ui.theme.SafetyBlue
+import kotlinx.coroutines.launch
+
+data class PermissionSnapshot(
+    val notificationAccess: Boolean = false,
+    val overlayAccess: Boolean = false,
+) {
+    val allGranted: Boolean get() = notificationAccess && overlayAccess
+}
+
+private enum class EventFilter { BLOCKED, TRUSTED }
+
+@Composable
+fun FrenoApp(
+    permissions: PermissionSnapshot,
+    onRequestNotificationAccess: () -> Unit,
+    onRequestOverlayAccess: () -> Unit,
+) {
+    val events by FrenoEventStore.events.collectAsStateWithLifecycle()
+    var filter by remember { mutableStateOf(EventFilter.BLOCKED) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val blocked = events.filterNot(FrenoEvent::trusted)
+    val trusted = events.filter(FrenoEvent::trusted)
+    val visibleEvents = if (filter == EventFilter.BLOCKED) blocked else trusted
+
+    Scaffold(
+        containerColor = Canvas,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { scaffoldPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(scaffoldPadding)
+                .statusBarsPadding(),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item(key = "app-header") { AppHeader(permissions.allGranted) }
+            item(key = "summary") { ProtectionSummary(blockedCount = blocked.size) }
+            item(key = "filters") {
+                EventTabs(
+                    selected = filter,
+                    blockedCount = blocked.size,
+                    trustedCount = trusted.size,
+                    onSelected = { filter = it },
+                )
+            }
+
+            if (visibleEvents.isEmpty()) {
+                item(key = "empty-${filter.name}") { EmptyEvents(filter) }
+            } else {
+                items(visibleEvents, key = FrenoEvent::id) { event ->
+                    NotificationEventCard(
+                        event = event,
+                        onToggleTrust = {
+                            if (event.trusted) {
+                                FrenoEventStore.distrust(event.id)
+                                scope.launch { snackbarHostState.showSnackbar("Volvió a Bloqueadas") }
+                            } else {
+                                FrenoEventStore.trust(event.id)
+                                scope.launch { snackbarHostState.showSnackbar("Se movió a Confiadas") }
+                            }
+                        },
+                    )
+                }
+            }
+
+            item(key = "permissions-title") {
+                SectionTitle(
+                    title = "Permisos del sistema",
+                    supporting = "Freno necesita estos dos accesos para detectar y frenar una alerta automáticamente.",
+                )
+            }
+            item(key = "permissions-card") {
+                PermissionsCard(
+                    permissions = permissions,
+                    onRequestNotificationAccess = onRequestNotificationAccess,
+                    onRequestOverlayAccess = onRequestOverlayAccess,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppHeader(allPermissionsGranted: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            modifier = Modifier.size(48.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = Danger,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Rounded.Security,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+        }
+        Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
+            Text("Freno", style = MaterialTheme.typography.titleLarge)
+            Text(
+                text = if (allPermissionsGranted) "Protección activa" else "Configuración incompleta",
+                color = if (allPermissionsGranted) Safe else Danger,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+        Icon(
+            imageVector = if (allPermissionsGranted) Icons.Rounded.CheckCircle else Icons.Rounded.Warning,
+            contentDescription = if (allPermissionsGranted) "Protección activa" else "Faltan permisos",
+            tint = if (allPermissionsGranted) Safe else Danger,
+            modifier = Modifier.size(28.dp),
+        )
+    }
+}
+
+@Composable
+private fun ProtectionSummary(blockedCount: Int) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = Ink,
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Text(
+                text = blockedCount.toString(),
+                color = Color.White,
+                fontSize = 48.sp,
+                lineHeight = 52.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = if (blockedCount == 1) "notificación bloqueada" else "notificaciones bloqueadas",
+                color = Color.White,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                text = "Freno las detuvo antes de que pudieras abrir sus enlaces.",
+                color = Color.White.copy(alpha = 0.78f),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun EventTabs(
+    selected: EventFilter,
+    blockedCount: Int,
+    trustedCount: Int,
+    onSelected: (EventFilter) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White, RoundedCornerShape(14.dp))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        EventTab(
+            label = "Bloqueadas ($blockedCount)",
+            selected = selected == EventFilter.BLOCKED,
+            onClick = { onSelected(EventFilter.BLOCKED) },
+            modifier = Modifier.weight(1f),
+        )
+        EventTab(
+            label = "Confiadas ($trustedCount)",
+            selected = selected == EventFilter.TRUSTED,
+            onClick = { onSelected(EventFilter.TRUSTED) },
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun EventTab(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val color by animateColorAsState(
+        targetValue = if (selected) Ink else Color.Transparent,
+        animationSpec = tween(160),
+        label = "tab-color",
+    )
+    Surface(
+        onClick = onClick,
+        modifier = modifier.height(52.dp),
+        color = color,
+        contentColor = if (selected) Color.White else InkMuted,
+        shape = RoundedCornerShape(11.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(label, style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+@Composable
+private fun NotificationEventCard(event: FrenoEvent, onToggleTrust: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = if (event.trusted) {
+                    "Notificación confiada de ${event.sender}, ${event.whenLabel}"
+                } else {
+                    "Notificación bloqueada de ${event.sender}, ${event.whenLabel}"
+                }
+            },
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Border),
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StatusBadge(trusted = event.trusted)
+                Spacer(modifier = Modifier.weight(1f))
+                Text(event.whenLabel, color = InkMuted, style = MaterialTheme.typography.labelMedium)
+            }
+            Text(
+                text = event.sender,
+                style = MaterialTheme.typography.titleMedium,
+                color = Ink,
+                modifier = Modifier.padding(top = 14.dp),
+            )
+            Text(
+                text = event.preview,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Ink,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = Border)
+            Row(verticalAlignment = Alignment.Top) {
+                Icon(
+                    imageVector = Icons.Rounded.Info,
+                    contentDescription = null,
+                    tint = if (event.trusted) Safe else Danger,
+                    modifier = Modifier.size(22.dp),
+                )
+                Column(modifier = Modifier.padding(start = 10.dp).weight(1f)) {
+                    Text(
+                        text = if (event.trusted) "Por qué está confiada" else "Por qué la bloqueó",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Ink,
+                    )
+                    Text(
+                        text = event.reason,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = InkMuted,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+            TrustActionButton(
+                trusted = event.trusted,
+                onClick = onToggleTrust,
+                modifier = Modifier.padding(top = 18.dp),
+            )
+            Text(
+                text = if (event.trusted) {
+                    "Desconfiar devuelve este evento a la lista de bloqueadas."
+                } else {
+                    "Confiar mueve solo este evento; no habilita futuros mensajes."
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = InkMuted,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatusBadge(trusted: Boolean) {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = if (trusted) Safe.copy(alpha = 0.1f) else DangerSoft,
+        contentColor = if (trusted) Safe else Danger,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = if (trusted) Icons.Rounded.Check else Icons.Rounded.Lock,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                text = if (trusted) "CONFIADA" else "BLOQUEADA",
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrustActionButton(trusted: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = tween(140, easing = CubicBezierEasing(0.23f, 1f, 0.32f, 1f)),
+        label = "trust-button-scale",
+    )
+    OutlinedButton(
+        onClick = onClick,
+        interactionSource = interactionSource,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .scale(scale)
+            .semantics { role = Role.Button },
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, if (trusted) Danger else SafetyBlue),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = if (trusted) Danger else SafetyBlue,
+        ),
+    ) {
+        Icon(
+            imageVector = if (trusted) Icons.Rounded.Warning else Icons.Rounded.CheckCircle,
+            contentDescription = null,
+            modifier = Modifier.size(22.dp),
+        )
+        Text(
+            text = if (trusted) "Desconfiar" else "Confiar",
+            modifier = Modifier.padding(start = 8.dp),
+            style = MaterialTheme.typography.labelLarge,
+        )
+    }
+}
+
+@Composable
+private fun SectionTitle(title: String, supporting: String) {
+    Column(modifier = Modifier.padding(top = 12.dp)) {
+        Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+        Text(
+            supporting,
+            style = MaterialTheme.typography.bodyMedium,
+            color = InkMuted,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+    }
+}
+
+@Composable
+private fun PermissionsCard(
+    permissions: PermissionSnapshot,
+    onRequestNotificationAccess: () -> Unit,
+    onRequestOverlayAccess: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Border),
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            PermissionRow(
+                icon = Icons.Rounded.Notifications,
+                title = "Leer notificaciones",
+                description = "Detecta mensajes peligrosos cuando llegan.",
+                granted = permissions.notificationAccess,
+                onRequest = onRequestNotificationAccess,
+            )
+            HorizontalDivider(color = Border)
+            PermissionRow(
+                icon = Icons.Rounded.Security,
+                title = "Mostrar alertas invasivas",
+                description = "Abre la advertencia roja encima de otras apps.",
+                granted = permissions.overlayAccess,
+                onRequest = onRequestOverlayAccess,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PermissionRow(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    granted: Boolean,
+    onRequest: () -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Surface(
+            shape = CircleShape,
+            color = if (granted) Safe.copy(alpha = 0.1f) else DangerSoft,
+            contentColor = if (granted) Safe else Danger,
+            modifier = Modifier.size(48.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(25.dp))
+            }
+        }
+        Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(description, style = MaterialTheme.typography.bodyMedium, color = InkMuted)
+        }
+        if (granted) {
+            Icon(
+                Icons.Rounded.CheckCircle,
+                contentDescription = "Permitido",
+                tint = Safe,
+                modifier = Modifier.size(28.dp),
+            )
+        } else {
+            Button(
+                onClick = onRequest,
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp),
+                modifier = Modifier.height(48.dp),
+            ) {
+                Text("Permitir")
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyEvents(filter: EventFilter) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Border),
+    ) {
+        Column(
+            modifier = Modifier.padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(
+                imageVector = if (filter == EventFilter.BLOCKED) Icons.Rounded.Security else Icons.Rounded.History,
+                contentDescription = null,
+                tint = InkMuted,
+                modifier = Modifier.size(40.dp),
+            )
+            Text(
+                text = if (filter == EventFilter.BLOCKED) {
+                    "Todavía no hay notificaciones bloqueadas"
+                } else {
+                    "Todavía no confiaste ninguna notificación"
+                },
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
+    }
+}
