@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -46,6 +45,9 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -67,8 +69,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.tooling.preview.Preview
 import com.grupo3.freno.data.FrenoEventStore
 import com.grupo3.freno.model.FrenoEvent
+import com.grupo3.freno.model.RecommendedAction
 import com.grupo3.freno.ui.theme.Border
 import com.grupo3.freno.ui.theme.Canvas
 import com.grupo3.freno.ui.theme.Danger
@@ -95,7 +99,9 @@ fun FrenoApp(
     onRequestOverlayAccess: () -> Unit,
 ) {
     val events by FrenoEventStore.events.collectAsStateWithLifecycle()
+    val highRiskAlert by FrenoEventStore.activeAlert.collectAsStateWithLifecycle()
     var filter by remember { mutableStateOf(EventFilter.BLOCKED) }
+    var selectedEvent by remember { mutableStateOf<FrenoEvent?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val blocked = events.filterNot(FrenoEvent::trusted)
@@ -131,6 +137,7 @@ fun FrenoApp(
                 items(visibleEvents, key = FrenoEvent::id) { event ->
                     NotificationEventCard(
                         event = event,
+                        onOpenDetail = { selectedEvent = event },
                         onToggleTrust = {
                             if (event.trusted) {
                                 FrenoEventStore.distrust(event.id)
@@ -159,6 +166,146 @@ fun FrenoApp(
             }
         }
     }
+
+    highRiskAlert?.let { event ->
+        CriticalAlert(event = event, onDismiss = FrenoEventStore::dismissAlert)
+    }
+    selectedEvent?.let { event ->
+        EventDetail(event = event, onDismiss = { selectedEvent = null })
+    }
+}
+
+@Composable
+private fun CriticalAlert(event: FrenoEvent, onDismiss: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = Danger,
+            contentColor = Color.White,
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.16f)) {
+                    Icon(
+                        imageVector = Icons.Rounded.Warning,
+                        contentDescription = null,
+                        modifier = Modifier.padding(12.dp).size(30.dp),
+                        tint = Color.White,
+                    )
+                }
+                Text(
+                    text = "Pausa. Puede ser una estafa",
+                    style = MaterialTheme.typography.headlineLarge,
+                    modifier = Modifier.padding(top = 20.dp).semantics { heading() },
+                )
+                Text(
+                    text = "${event.source} · ${event.sender}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White.copy(alpha = 0.84f),
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+                Text(
+                    text = event.reason,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+                Text(
+                    text = "Qué conviene hacer",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = 20.dp),
+                )
+                Text(
+                    text = recommendationFor(event.action),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth().height(56.dp).padding(top = 8.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Danger,
+                    ),
+                ) {
+                    Text("ENTENDIDO", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+    }
+}
+
+private fun recommendationFor(action: RecommendedAction): String = when (action) {
+    RecommendedAction.VERIFY_KNOWN_CONTACT -> "Antes de transferir, llamá al número que ya conocés."
+    RecommendedAction.AVOID_LINK_AND_VERIFY -> "No abras el enlace. Consultá a la entidad desde su canal oficial."
+    RecommendedAction.DO_NOT_SHARE_CODE -> "No compartas códigos ni claves con nadie."
+    RecommendedAction.NONE -> "Revisá el mensaje con cautela antes de realizar cualquier acción."
+}
+
+@Composable
+private fun EventDetail(event: FrenoEvent, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(24.dp), color = Color.White) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("Detalle del análisis", style = MaterialTheme.typography.headlineLarge)
+                Text(
+                    text = "${event.source} · ${event.whenLabel}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = InkMuted,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                Text(
+                    text = if (event.risk == com.grupo3.freno.model.RiskLevel.HIGH) {
+                        "¿Por qué se marcó?"
+                    } else {
+                        "Resultado del análisis"
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 20.dp),
+                )
+                Text(event.reason, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 6.dp))
+                Text(
+                    text = "Señal detectada: ${reasonLabel(event.reasonCode)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+                Text(
+                    text = recommendationFor(event.action),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = InkMuted,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                Text(
+                    text = explanationLabel(event.explanationSource),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = InkMuted,
+                    modifier = Modifier.padding(top = 18.dp),
+                )
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End).padding(top = 8.dp)) {
+                    Text("CERRAR")
+                }
+            }
+        }
+    }
+}
+
+private fun reasonLabel(code: String): String = when (code) {
+    "NEW_NUMBER_AND_URGENT_PAYMENT" -> "Cambio de número y pedido urgente de dinero"
+    "CREDENTIAL_REQUEST" -> "Pedido de credenciales mediante un enlace"
+    "CODE_SHARING_REQUEST" -> "Pedido de compartir un código"
+    "INSUFFICIENT_CONTEXT" -> "Contenido insuficiente"
+    "ANALYSIS_UNAVAILABLE" -> "Análisis no disponible"
+    "NO_CLEAR_SIGNAL" -> "Sin señales claras"
+    else -> "Señal a revisar"
+}
+
+private fun explanationLabel(source: com.grupo3.freno.model.ExplanationSource): String = when (source) {
+    com.grupo3.freno.model.ExplanationSource.GEMINI -> "Análisis de Gemini"
+    com.grupo3.freno.model.ExplanationSource.TEMPLATE -> "Texto de respaldo de Freno"
+    com.grupo3.freno.model.ExplanationSource.UNAVAILABLE -> "Análisis no disponible"
 }
 
 @Composable
@@ -285,7 +432,11 @@ private fun EventTab(
 }
 
 @Composable
-private fun NotificationEventCard(event: FrenoEvent, onToggleTrust: () -> Unit) {
+private fun NotificationEventCard(
+    event: FrenoEvent,
+    onOpenDetail: () -> Unit,
+    onToggleTrust: () -> Unit,
+) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -341,6 +492,9 @@ private fun NotificationEventCard(event: FrenoEvent, onToggleTrust: () -> Unit) 
                         modifier = Modifier.padding(top = 4.dp),
                     )
                 }
+            }
+            TextButton(onClick = onOpenDetail, modifier = Modifier.padding(top = 8.dp)) {
+                Text("Ver detalle")
             }
             TrustActionButton(
                 trusted = event.trusted,
@@ -538,5 +692,26 @@ private fun EmptyEvents(filter: EventFilter) {
                 modifier = Modifier.padding(top = 12.dp),
             )
         }
+    }
+}
+
+@Preview(
+    name = "Inicio - teléfono",
+    showBackground = true,
+    backgroundColor = 0xFFF6F8FB,
+    widthDp = 360,
+    heightDp = 800,
+)
+@Composable
+private fun FrenoHomePreview() {
+    com.grupo3.freno.ui.theme.FrenoTheme {
+        FrenoApp(
+            permissions = PermissionSnapshot(
+                notificationAccess = true,
+                overlayAccess = true,
+            ),
+            onRequestNotificationAccess = {},
+            onRequestOverlayAccess = {},
+        )
     }
 }

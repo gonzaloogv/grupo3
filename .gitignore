@@ -50,3 +50,8 @@ backend/data/phishtank/*
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Herramientas y entornos descargados localmente
+/tools/*/
+/tools/*.zip
+/tools/studio-local.vmoptions
