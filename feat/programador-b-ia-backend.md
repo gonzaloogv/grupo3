@@ -63,10 +63,10 @@ Preparar **12 casos**: 6 con señales de engaño, 4 cotidianos y 2 ambiguos. Agr
 
 **Dependencia:** arranque; puede avanzarse sin esperar Android.
 
-- [ ] Incluir suplantación bancaria, familiar y pedido de códigos; al menos dos mensajes contienen enlaces sintéticos `.example`.
-- [ ] Cubrir MATCH, NO_MATCH, UNAVAILABLE y mensaje sin URL mediante el proveedor simulado.
-- [ ] Compartir casos de desarrollo para integración y conservar los reservados para el cierre.
-- [ ] No usar resultados reservados para ajustar el prompt ni presentar esta muestra como precisión real.
+- [x] Incluir suplantación bancaria, familiar y pedido de códigos; al menos dos mensajes contienen enlaces sintéticos `.example`.
+- [x] Cubrir MATCH, NO_MATCH, UNAVAILABLE y mensaje sin URL mediante el proveedor simulado.
+- [x] Compartir casos de desarrollo para integración y conservar los reservados para el cierre.
+- [x] No usar resultados reservados para ajustar el prompt ni presentar esta muestra como precisión real.
 
 ## B-06 · Integración Android, caché y límites · 45 min
 

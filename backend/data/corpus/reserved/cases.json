@@ -1,0 +1,98 @@
+[
+  {
+    "id": "res-01-bank-token",
+    "scenario": "DECEPTIVE",
+    "family": "BANK",
+    "source": "SMS",
+    "text": "Alerta Santander: Su clave token ha sido suspendida preventivamente. Reactivela de inmediato ingresando a https://reactivacion-cuenta.example/token",
+    "contentIncomplete": false,
+    "urls": [
+      "https://reactivacion-cuenta.example/token"
+    ],
+    "locale": "es-AR",
+    "expectedRisk": "HIGH",
+    "expectedCategory": "BANK_PHISHING",
+    "expectedReasonCode": "CREDENTIAL_REQUEST",
+    "expectedAction": "AVOID_LINK_AND_VERIFY",
+    "reputationFixture": "match-social-engineering"
+  },
+  {
+    "id": "res-02-family-chip",
+    "scenario": "DECEPTIVE",
+    "family": "FAMILY",
+    "source": "WHATSAPP",
+    "text": "Papa perdi la billetera y cambie de chip, este es mi telefono nuevo. Pasame plata por transferencia antes de las seis que no puedo volver a casa.",
+    "contentIncomplete": false,
+    "urls": [],
+    "locale": "es-AR",
+    "expectedRisk": "HIGH",
+    "expectedCategory": "FAMILY_IMPERSONATION",
+    "expectedReasonCode": "NEW_NUMBER_AND_URGENT_PAYMENT",
+    "expectedAction": "VERIFY_KNOWN_CONTACT",
+    "reputationFixture": "no-url"
+  },
+  {
+    "id": "res-03-code-transfer",
+    "scenario": "DECEPTIVE",
+    "family": "CODE",
+    "source": "SMS",
+    "text": "Banco Alerta: Transfiriendo fondos a un nuevo destinatario. Si desconoce la operacion, envie inmediatamente su clave de seguridad por este medio.",
+    "contentIncomplete": false,
+    "urls": [],
+    "locale": "es-AR",
+    "expectedRisk": "HIGH",
+    "expectedCategory": "CODE_REQUEST",
+    "expectedReasonCode": "CODE_SHARING_REQUEST",
+    "expectedAction": "DO_NOT_SHARE_CODE",
+    "reputationFixture": "no-url"
+  },
+  {
+    "id": "res-04-routine-school",
+    "scenario": "ROUTINE",
+    "family": "NONE",
+    "source": "WHATSAPP",
+    "text": "Buenas tardes familias, les recordamos que el proximo lunes la escuela abrira en su horario habitual de las ocho de la mañana.",
+    "contentIncomplete": false,
+    "urls": [],
+    "locale": "es-AR",
+    "expectedRisk": "LOW",
+    "expectedCategory": "NONE",
+    "expectedReasonCode": "NO_CLEAR_SIGNAL",
+    "expectedAction": "NONE",
+    "reputationFixture": "no-url"
+  },
+  {
+    "id": "res-05-routine-utility-link",
+    "scenario": "ROUTINE",
+    "family": "NONE",
+    "source": "SMS",
+    "text": "Aviso de servicio: Se restablecio el suministro electrico en su zona. Mas informacion y consultas en https://portal-seguro.example/ayuda",
+    "contentIncomplete": false,
+    "urls": [
+      "https://portal-seguro.example/ayuda"
+    ],
+    "locale": "es-AR",
+    "expectedRisk": "LOW",
+    "expectedCategory": "NONE",
+    "expectedReasonCode": "NO_CLEAR_SIGNAL",
+    "expectedAction": "NONE",
+    "reputationFixture": "no-match-url"
+  },
+  {
+    "id": "res-06-ambiguous-incomplete",
+    "scenario": "AMBIGUOUS",
+    "family": "NONE",
+    "source": "SMS",
+    "text": "Aviso truncado del sistema: Por favor verifique el estado de su tramite en https://servicio-verificacion.example/alerta",
+    "contentIncomplete": true,
+    "urls": [
+      "https://servicio-verificacion.example/alerta"
+    ],
+    "locale": "es-AR",
+    "expectedRisk": "UNKNOWN",
+    "expectedCategory": "UNKNOWN",
+    "expectedReasonCode": "INSUFFICIENT_CONTEXT",
+    "expectedAction": "NONE",
+    "reputationFixture": "unavailable-url"
+  }
+]
