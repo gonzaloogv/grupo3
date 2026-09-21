@@ -16,11 +16,12 @@ class AnalysisContractSerializationTest {
             source = NotificationSource.SMS,
             text = "Soy tu hijo, cambié de número.",
             contentIncomplete = false,
+            urls = listOf("https://example.com/ingresar"),
             locale = "es-AR",
         )
 
         assertEquals(
-            """{"eventId":"demo-001","source":"SMS","text":"Soy tu hijo, cambié de número.","contentIncomplete":false,"locale":"es-AR"}""",
+            """{"eventId":"demo-001","source":"SMS","text":"Soy tu hijo, cambié de número.","contentIncomplete":false,"urls":["https://example.com/ingresar"],"locale":"es-AR"}""",
             json.encodeToString(request),
         )
     }
@@ -39,7 +40,9 @@ class AnalysisContractSerializationTest {
               "analyzer": "GEMINI",
               "model": "gemini-3.5-flash-lite",
               "promptVersion": "freno-v1",
-              "explanationSource": "GEMINI"
+              "explanationSource": "GEMINI",
+              "decisionSources": ["GEMINI"],
+              "urlAssessment": {"status":"NO_URL","provider":"NONE","threatTypes":[]}
             }
             """.trimIndent(),
         )
@@ -52,6 +55,9 @@ class AnalysisContractSerializationTest {
         assertEquals(Analyzer.GEMINI, result.analyzer)
         assertEquals("gemini-3.5-flash-lite", result.model)
         assertEquals(ExplanationSource.GEMINI, result.explanationSource)
+        assertEquals(listOf(DecisionSource.GEMINI), result.decisionSources)
+        assertEquals(UrlAssessmentStatus.NO_URL, result.urlAssessment.status)
+        assertEquals(UrlAssessmentProvider.NONE, result.urlAssessment.provider)
     }
 
     @Test
@@ -68,7 +74,9 @@ class AnalysisContractSerializationTest {
               "analyzer": "UNAVAILABLE",
               "model": null,
               "promptVersion": "freno-v1",
-              "explanationSource": "UNAVAILABLE"
+              "explanationSource": "UNAVAILABLE",
+              "decisionSources": ["LOCAL_POLICY"],
+              "urlAssessment": {"status":"NO_URL","provider":"NONE","threatTypes":[]}
             }
             """.trimIndent(),
         )
@@ -80,5 +88,6 @@ class AnalysisContractSerializationTest {
         assertEquals(Analyzer.UNAVAILABLE, result.analyzer)
         assertNull(result.model)
         assertEquals(ExplanationSource.UNAVAILABLE, result.explanationSource)
+        assertEquals(listOf(DecisionSource.LOCAL_POLICY), result.decisionSources)
     }
 }

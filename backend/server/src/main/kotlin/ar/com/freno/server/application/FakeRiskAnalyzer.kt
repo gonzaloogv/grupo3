@@ -5,9 +5,13 @@ import ar.com.freno.shared.contract.AnalysisRequest
 import ar.com.freno.shared.contract.AnalysisResult
 import ar.com.freno.shared.contract.Analyzer
 import ar.com.freno.shared.contract.Category
+import ar.com.freno.shared.contract.DecisionSource
 import ar.com.freno.shared.contract.ExplanationSource
 import ar.com.freno.shared.contract.ReasonCode
 import ar.com.freno.shared.contract.Risk
+import ar.com.freno.shared.contract.UrlAssessment
+import ar.com.freno.shared.contract.UrlAssessmentProvider
+import ar.com.freno.shared.contract.UrlAssessmentStatus
 
 class FakeRiskAnalyzer(
     private val promptVersion: String = "freno-v1",
@@ -24,5 +28,11 @@ class FakeRiskAnalyzer(
             model = null,
             promptVersion = promptVersion,
             explanationSource = ExplanationSource.TEMPLATE,
+            decisionSources = listOf(DecisionSource.LOCAL_POLICY),
+            urlAssessment = UrlAssessment(
+                status = if (input.urls.isEmpty()) UrlAssessmentStatus.NO_URL else UrlAssessmentStatus.UNAVAILABLE,
+                provider = UrlAssessmentProvider.NONE,
+                threatTypes = emptyList(),
+            ),
         )
 }

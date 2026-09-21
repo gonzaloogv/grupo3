@@ -38,6 +38,7 @@ Solicitud:
   "source": "SMS",
   "text": "Soy tu hijo, cambié de número. Transferime urgente al alias [ALIAS].",
   "contentIncomplete": false,
+  "urls": [],
   "locale": "es-AR"
 }
 ```
@@ -55,13 +56,26 @@ Respuesta temporal de B-01:
   "analyzer": "FAKE",
   "model": null,
   "promptVersion": "freno-v1",
-  "explanationSource": "TEMPLATE"
+  "explanationSource": "TEMPLATE",
+  "decisionSources": ["LOCAL_POLICY"],
+  "urlAssessment": {
+    "status": "NO_URL",
+    "provider": "NONE",
+    "threatTypes": []
+  }
 }
 ```
 
 Esta respuesta determinística sirve solamente para integrar Android y comprobar
 el contrato. `analyzer=FAKE` evita presentarla como una decisión real. B-02
-reemplazará este adaptador por Gemini y conservará los mismos DTO.
+reemplazará este adaptador por Gemini y conservará los mismos DTO. Si se
+envían URLs durante el modo de prueba, la evaluación queda `UNAVAILABLE`;
+`FAKE` no representa una consulta real a Google Safe Browsing.
+
+`urls` admite hasta tres URLs HTTP(S) absolutas con host. Se rechaza la
+solicitud con `400 Bad Request` si excede ese límite o contiene otro esquema.
+Puede omitirse durante la transición del cliente; equivale a `[]`. El servidor
+no abre las URLs en este paso.
 
 ## Valores cerrados
 
@@ -72,7 +86,13 @@ reemplazará este adaptador por Gemini y conservará los mismos DTO.
 - `reasonCode`: `NEW_NUMBER_AND_URGENT_PAYMENT`, `CREDENTIAL_REQUEST`,
   `CODE_SHARING_REQUEST`, `INSUFFICIENT_CONTEXT`, `NO_CLEAR_SIGNAL`,
   `OTHER_SIGNAL`, `ANALYSIS_UNAVAILABLE`.
+  También `URL_LISTED_AS_THREAT` para una futura coincidencia de reputación.
 - `action`: `VERIFY_KNOWN_CONTACT`, `AVOID_LINK_AND_VERIFY`,
   `DO_NOT_SHARE_CODE`, `NONE`.
 - `analyzer`: `GEMINI`, `UNAVAILABLE`, `FAKE`.
 - `explanationSource`: `GEMINI`, `TEMPLATE`, `UNAVAILABLE`.
+- `decisionSources`: lista no vacía de `GEMINI`, `GOOGLE_SAFE_BROWSING`,
+  `LOCAL_POLICY`.
+- `urlAssessment.status`: `NO_URL`, `MATCH`, `NO_MATCH`, `UNAVAILABLE`.
+- `urlAssessment.provider`: `NONE`, `GOOGLE_SAFE_BROWSING`.
+- `urlAssessment.threatTypes`: `SOCIAL_ENGINEERING`, `MALWARE`.

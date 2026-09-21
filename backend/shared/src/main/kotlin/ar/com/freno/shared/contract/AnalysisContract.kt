@@ -8,6 +8,7 @@ data class AnalysisRequest(
     val source: NotificationSource,
     val text: String,
     val contentIncomplete: Boolean,
+    val urls: List<String> = emptyList(),
     val locale: String,
 )
 
@@ -23,7 +24,43 @@ data class AnalysisResult(
     val model: String?,
     val promptVersion: String,
     val explanationSource: ExplanationSource,
+    val decisionSources: List<DecisionSource>,
+    val urlAssessment: UrlAssessment,
 )
+
+@Serializable
+data class UrlAssessment(
+    val status: UrlAssessmentStatus,
+    val provider: UrlAssessmentProvider,
+    val threatTypes: List<UrlThreatType>,
+)
+
+@Serializable
+enum class DecisionSource {
+    GEMINI,
+    GOOGLE_SAFE_BROWSING,
+    LOCAL_POLICY,
+}
+
+@Serializable
+enum class UrlAssessmentStatus {
+    NO_URL,
+    MATCH,
+    NO_MATCH,
+    UNAVAILABLE,
+}
+
+@Serializable
+enum class UrlAssessmentProvider {
+    NONE,
+    GOOGLE_SAFE_BROWSING,
+}
+
+@Serializable
+enum class UrlThreatType {
+    SOCIAL_ENGINEERING,
+    MALWARE,
+}
 
 @Serializable
 enum class NotificationSource {
@@ -58,6 +95,7 @@ enum class ReasonCode {
     NO_CLEAR_SIGNAL,
     OTHER_SIGNAL,
     ANALYSIS_UNAVAILABLE,
+    URL_LISTED_AS_THREAT,
 }
 
 @Serializable
