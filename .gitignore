@@ -1,0 +1,35 @@
+# Secretos y configuración local
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Gradle / Kotlin / JVM
+.gradle/
+**/.gradle/
+build/
+**/build/
+out/
+*.class
+
+# IDEs y editores
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Logs y archivos temporales
+*.log
+*.tmp
+tmp/
+
+# Datos descargados de PhishTank: se regeneran y pueden ser grandes
+backend/data/phishtank/*
+!backend/data/phishtank/.gitkeep
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+Desktop.ini
