@@ -1,6 +1,6 @@
 # Tareas y validación · 2 programadores · 8 horas
 
-Todas las tareas están **pendientes**. A lleva Android, interfaz e historial; B lleva backend, Gemini, justificaciones y evaluación. P0 incluye alerta visual e historial persistente. La voz queda descartada; alarma sonora y overlay son opcionales. Correo es el primer canal externo; Telegram va después y solo si sobra tiempo.
+Todas las tareas están **pendientes**. A lleva Android, interfaz e historial; B lleva backend, Gemini, Google Safe Browsing, justificaciones y evaluación. P0 incluye alerta visual e historial persistente. La voz queda descartada; alarma sonora y overlay son opcionales. Correo es el primer canal externo; Telegram va después y solo si sobra tiempo.
 
 ## 1. Arranque compartido · 30 minutos
 
@@ -17,22 +17,22 @@ Cada integrante dispone de **270 minutos de implementación** más arranque, pru
 | A-03 | Historial persistente y detalle | 75 min | DTO | Room, lista y justificación sobreviven a reabrir; consulta offline y borrado |
 | A-04 | Estado y ajustes mínimos | 20 min | A-01 | Consentimiento, permisos y pausa desde el historial |
 | A-05 | Extracción, duplicados y coordinación | 40 min | A-01, A-02, contrato A-03 | Crear/actualizar registro; duplicados y contenido insuficiente controlados |
-| A-06 | Backend real y conservación del resultado | 40 min | A-05, B-01, B-02 | Respuesta con motivo se persiste en el eventId correcto |
+| A-06 | Backend real y conservación del resultado | 40 min | A-05, B-01, B-02, B-03 | Respuesta, procedencia y estado de reputación se persisten en el eventId correcto |
 | A-07 | Fallos, persistencia y accesibilidad | 25 min | A-02, A-03, A-04, A-06 | Permisos/red no rompen UI; historial persiste y se borra; fuente al 200 % |
 
 Orden recomendado: **A-01 → A-02 → A-03 → A-05 → A-06 → A-04 → A-07**. A controla todo `app/`, Gradle y Manifest. Consultar [features de A](../feat/programador-a-android.md) y [diseño de interfaz e historial](INTERFAZ_E_HISTORIAL.md).
 
-## 3. B · Backend, Gemini y evaluación · 270 minutos
+## 3. B · Backend, Gemini, Safe Browsing y evaluación · 270 minutos
 
 | ID | Feature | Tiempo | Depende de | Terminado cuando |
 | --- | --- | --- | --- | --- |
-| B-01 | API, contrato y token de demo | 20 min | F-00 | A puede invocar el endpoint; sin token se rechaza |
+| B-01 | API, contrato y token de demo | 20 min | F-00 | A deserializa urlAssessment; sin token se rechaza |
 | B-02 | Gemini real, clasificación y justificación | 40 min | B-01 | Devuelve riesgo y motivo validado con procedencia de explicación |
-| B-03 | Errores y respuestas inválidas | 45 min | B-02 | 429, timeout, bloqueo y JSON inválido producen UNKNOWN/UNAVAILABLE |
-| B-04 | Corpus sintético | 35 min | F-00 | 12 casos etiquetados, separados en desarrollo y reservados |
-| B-05 | Integración Android y contrato | 45 min | B-01, B-02, B-03; A-06 para ensayo | Resultado y motivo quedan en el registro correcto; historial no llama otra vez a Gemini |
-| B-06 | Caché y límites de análisis | 35 min | B-01, B-02 | Repeticiones completadas se reutilizan; distinto contenido no usa el mismo resultado |
-| B-07 | Evaluación inicial y entorno reproducible | 50 min | B-03, B-04, B-06 | Prompt versionado, resultados de desarrollo y arranque documentados sin secretos |
+| B-03 | Safe Browsing y reputación de URLs | 30 min | B-01 | NO_URL, MATCH, NO_MATCH y UNAVAILABLE funcionan con proveedor simulado y una prueba real |
+| B-04 | Fusión conservadora y errores | 45 min | B-02, B-03 | MATCH fuerza HIGH; fallos y respuestas inválidas nunca producen seguridad falsa |
+| B-05 | Corpus sintético y fixtures de reputación | 30 min | F-00 | 12 mensajes y fixtures MATCH/NO_MATCH/UNAVAILABLE, mitad reservada |
+| B-06 | Integración Android, caché y límites | 45 min | B-01 a B-04; A-06 para ensayo | Resultado completo queda en el registro; repetir no vuelve a consultar proveedores |
+| B-07 | Evaluación y ejecución reproducible | 60 min | B-04, B-05, B-06 | Resultados, prompt, fusión y entorno documentados sin secretos |
 
 B puede avanzar con JSON de ejemplo mientras A implementa la app. B controla `server/` y `shared/`. Detalle: [features de B](../feat/programador-b-ia-backend.md).
 
@@ -42,9 +42,9 @@ B puede avanzar con JSON de ejemplo mientras A implementa la app. B controla `se
 | --- | --- | --- |
 | 0:30 | App, health y contrato inicial | A + B |
 | 1:30 | Captura real comprobada; llamada real de Gemini independiente | A + B |
-| 3:00 | Historial y detalle con resultados simulados persistentes | A |
+| 3:00 | Historial persistente; Safe Browsing y fusión probados con fixtures | A + B |
 | 4:00 | Pipeline de captura e historial listo; integración real en curso | A + B |
-| 5:00 | Notificación → Gemini → alerta visual → historial con motivo; congelar P0 | A + B |
+| 5:00 | Notificación → Gemini/Safe Browsing → alerta visual → historial con motivo; congelar P0 | A + B |
 | 6:00 | Pruebas reservadas y de dispositivo registradas | A + B |
 | 7:00 | APK, dos ensayos y video de respaldo | A + B |
 | 8:00 | Fin del buffer y entrega | A + B |
@@ -73,6 +73,12 @@ Son expectativas humanas para una muestra pequeña, no verificación de remitent
 | Sin internet, 429 o timeout | UNKNOWN; sin garantía falsa de seguridad | B + A |
 | JSON inválido o campos incompatibles | Rechazo/fallback controlado | B |
 | Instrucción dentro del mensaje para devolver LOW | Se trata como dato; no cambia la política de acciones | B |
+| URL con MATCH simulado | HIGH con motivo URL_LISTED_AS_THREAT, acción de no abrir y atribución a Google | B + A |
+| URL con NO_MATCH | No se muestra «seguro» y no se reduce la clasificación de Gemini | B + A |
+| URL con timeout o 429 | Estado UNAVAILABLE; LOW de Gemini se convierte en UNKNOWN | B |
+| Más de tres URLs | `contentIncomplete=true`; si Gemini solo daría LOW, el resultado final es UNKNOWN | A + B |
+| URL con MATCH y Gemini caído | HIGH basado en Google; analyzer UNAVAILABLE y explicación de plantilla | B |
+| Mensaje sin URL | No se llama a Safe Browsing; Gemini conserva su flujo normal | B |
 | Texto vacío, oculto o truncado | No fingir evaluación completa | A |
 | Fuente al 200 % | Alerta e historial legibles y controles accesibles | A |
 | Cierre durante error de red | Alerta cerrable; historial conserva el fallo con causa | A |
@@ -95,11 +101,11 @@ Guion de 3 minutos:
 1. **0:00–0:25:** problema y teléfono configurado, Freno fuera del primer plano.
 2. **0:25–0:50:** mensaje cotidiano que no interrumpe.
 3. **0:50–1:25:** mensaje sintético de estafa → aviso → alerta visual. Mostrar el toque que abre la advertencia.
-4. **1:25–2:10:** ENTENDIDO cierra; abrir historial y detalle para mostrar por qué Gemini marcó ese mensaje.
+4. **1:25–2:10:** ENTENDIDO cierra; abrir historial y detalle para mostrar si la señal vino de Gemini, Safe Browsing o ambos.
 5. **2:10–2:35:** cerrar/reabrir la app y conservar el registro; mostrar correo solo si el extra funciona y el tiempo alcanza.
 6. **2:35–3:00:** mostrar alcance validado y siguientes pasos.
 
-Entregar APK, servidor ejecutable, variables de ejemplo sin secretos, prompt versionado, 12 casos con resultados, pasos reproducibles y video de 60–90 segundos. Anotar fuente, teléfono/Android, modalidad de presentación y limitaciones. Distinguir demostración simulada de flujo real.
+Entregar APK, servidor ejecutable, variables de ejemplo sin secretos, prompt versionado, 12 casos con resultados, prueba de Safe Browsing documentada, pasos reproducibles y video de 60–90 segundos. Anotar fuente, teléfono/Android, modalidad de presentación y limitaciones. Distinguir demostración simulada de flujo real.
 
 ## 7. Extras y recortes
 
