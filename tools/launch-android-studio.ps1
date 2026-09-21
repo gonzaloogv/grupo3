@@ -19,6 +19,7 @@ $env:USERPROFILE = Join-Path $studioRoot 'user'
 $env:ANDROID_HOME = Join-Path $PSScriptRoot 'android-sdk'
 $env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
 $env:ANDROID_USER_HOME = Join-Path $PSScriptRoot 'android-user-home'
+$env:ANDROID_AVD_HOME = Join-Path $env:ANDROID_USER_HOME 'avd'
 $env:GRADLE_USER_HOME = Join-Path $PSScriptRoot 'gradle-home'
 $env:Path = "$(Join-Path $env:ANDROID_HOME 'platform-tools');$env:Path"
 $env:JAVA_TOOL_OPTIONS = '-Djdk.net.unixdomain.tmpdir="C:\Users\foto alex\Desktop\hackaton\tmp" -Didea.trust.all.projects=true'
