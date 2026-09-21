@@ -3,6 +3,14 @@ package ar.com.freno.server.application
 import ar.com.freno.shared.contract.ReasonCode
 
 internal object ExplanationTemplates {
+    private val uriScheme = Regex(
+        "(?i)(?<![\\p{L}\\d])[\\p{L}][\\p{L}\\d+.-]{1,31}:[^\\s]+",
+    )
+    private val bareHostname = Regex(
+        "(?i)(?<![\\p{L}\\d_-])(?:[\\p{L}\\d](?:[\\p{L}\\d-]{0,61}[\\p{L}\\d])?\\.)+" +
+            "[\\p{L}]{2,63}(?=$|[^\\p{L}\\d_-])",
+    )
+
     const val URL_THREAT =
         "Google reporta este enlace como potencialmente peligroso; no lo abras y verificá por un canal conocido."
 
@@ -10,7 +18,8 @@ internal object ExplanationTemplates {
         val normalized = reason.trim()
         return normalized.isNotEmpty() &&
             normalized.split(Regex("\\s+")).size <= 25 &&
-            !Regex("(?i)https?://|www\\.").containsMatchIn(normalized)
+            !uriScheme.containsMatchIn(normalized) &&
+            !bareHostname.containsMatchIn(normalized)
     }
 
     fun forReasonCode(reasonCode: ReasonCode): String = when (reasonCode) {

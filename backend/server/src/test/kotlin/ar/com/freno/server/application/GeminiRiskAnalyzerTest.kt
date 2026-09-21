@@ -193,6 +193,48 @@ class GeminiRiskAnalyzerTest {
     }
 
     @Test
+    fun `model explanation with a bare domain uses a local template`() = runBlocking {
+        val client = HttpClient(MockEngine {
+            respond(
+                bankPhishingResponse("El mensaje pide credenciales mediante banco.example bajo presión."),
+                HttpStatusCode.OK,
+                headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        })
+        try {
+            val result = analyzer(client).analyze(request("El banco pide credenciales bajo presión."))
+
+            assertEquals(Risk.HIGH, result.risk)
+            assertEquals(ExplanationSource.TEMPLATE, result.explanationSource)
+            assertEquals(listOf(DecisionSource.GEMINI, DecisionSource.LOCAL_POLICY), result.decisionSources)
+            assertFalse(result.reasonSimple.contains("banco.example"))
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun `model explanation with an alternate URI scheme uses a local template`() = runBlocking {
+        val client = HttpClient(MockEngine {
+            respond(
+                bankPhishingResponse("El mensaje pide credenciales mediante ftp://banco.example bajo presión."),
+                HttpStatusCode.OK,
+                headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        })
+        try {
+            val result = analyzer(client).analyze(request("El banco pide credenciales bajo presión."))
+
+            assertEquals(Risk.HIGH, result.risk)
+            assertEquals(ExplanationSource.TEMPLATE, result.explanationSource)
+            assertEquals(listOf(DecisionSource.GEMINI, DecisionSource.LOCAL_POLICY), result.decisionSources)
+            assertFalse(result.reasonSimple.contains("ftp:"))
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
     fun `generic explanation with only common words does not justify high risk`() = runBlocking {
         val generic = successfulResponse
             .replace("FAMILY_IMPERSONATION", "BANK_PHISHING")
@@ -263,4 +305,10 @@ class GeminiRiskAnalyzerTest {
 
     private val successfulResponse =
         """{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"{\"risk\":\"HIGH\",\"category\":\"FAMILY_IMPERSONATION\",\"reasonCode\":\"NEW_NUMBER_AND_URGENT_PAYMENT\",\"reasonSimple\":\"El mensaje dice que cambió de número y pide una transferencia urgente.\",\"action\":\"VERIFY_KNOWN_CONTACT\"}"}]}}]}"""
+
+    private fun bankPhishingResponse(reason: String) = successfulResponse
+        .replace("FAMILY_IMPERSONATION", "BANK_PHISHING")
+        .replace("NEW_NUMBER_AND_URGENT_PAYMENT", "CREDENTIAL_REQUEST")
+        .replace("El mensaje dice que cambió de número y pide una transferencia urgente.", reason)
+        .replace("VERIFY_KNOWN_CONTACT", "AVOID_LINK_AND_VERIFY")
 }

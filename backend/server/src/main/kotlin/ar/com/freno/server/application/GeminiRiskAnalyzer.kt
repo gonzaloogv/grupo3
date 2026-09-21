@@ -109,10 +109,10 @@ class GeminiRiskAnalyzer(
         val modelText = candidate.getValue("content").jsonObject.getValue("parts").jsonArray.first()
             .jsonObject.getValue("text").jsonPrimitive.content
         val classification = json.decodeFromString<ModelClassification>(modelText)
-        val usesTemplate = !ExplanationTemplates.isSafe(classification.reasonSimple)
         val safeClassification = classification.copy(
             reasonSimple = SensitiveDataRedactor.redact(classification.reasonSimple),
         )
+        val usesTemplate = !ExplanationTemplates.isSafe(safeClassification.reasonSimple)
         require(safeClassification.isValidFor(SensitiveDataRedactor.redact(input.text))) {
             "Invalid Gemini classification"
         }
