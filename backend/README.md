@@ -1,8 +1,8 @@
 # Backend de Freno
 
-Esqueleto del frente B: contrato compartido, API Ktor, Gemini, reputación local
-con el feed de PhishTank, caché y evaluación. La implementación funcional se
-realiza en ramas separadas por feature y se integra mediante PR a `develop`.
+Frente B: contrato compartido, API Ktor y clasificación con Gemini. La consulta
+de reputación de URLs con Google Safe Browsing, la caché y la evaluación se
+implementan en ramas posteriores y se integran a `develop` por feature.
 
 ## Convenciones base
 
@@ -12,10 +12,8 @@ realiza en ramas separadas por feature y se integra mediante PR a `develop`.
 - Secretos solo en `backend/.env`, ignorado por Git. El archivo
   `backend/.env.example` documenta las variables sin valores sensibles.
 - Gemini permanece detrás del servidor; ninguna clave se distribuye en la APK.
-- PhishTank se consulta mediante una copia local de su feed verificado y activo.
-  Una coincidencia exacta aporta evidencia; no encontrar una URL nunca significa
-  que el mensaje sea seguro.
-- Los datos descargados de PhishTank no se versionan ni reciben texto del usuario.
+- Google Safe Browsing se usará solo para URLs, en el servidor. Una ausencia de
+  coincidencia no equivale a declarar seguro el mensaje.
 
 ## Estructura
 
@@ -34,7 +32,7 @@ backend/
 │       │   │   ├── infrastructure/
 │       │   │   │   ├── cache/
 │       │   │   │   ├── gemini/
-│       │   │   │   └── phishtank/
+│       │   │   │   └── safe_browsing/
 │       │   │   ├── observability/  # Logs sin contenido sensible
 │       │   │   └── plugins/        # Configuración Ktor
 │       │   └── resources/
@@ -43,7 +41,6 @@ backend/
 ├── data/
 │   ├── corpus/{development,reserved}/
 │   ├── evaluation/
-│   └── phishtank/                  # Feed local ignorado por Git
 ├── docs/                           # Contrato y resultados reproducibles
 └── scripts/                        # Arranque, actualización y evaluación
 ```
@@ -66,6 +63,16 @@ limpio y no modificar el contrato compartido sin coordinar con Android.
 ## Contrato HTTP
 
 El contrato inicial, los encabezados y ejemplos de B-01 están documentados en
-[`docs/API_CONTRACT.md`](docs/API_CONTRACT.md). Hasta integrar B-02, el servidor
-responde con un analizador determinístico identificado como `FAKE`; no representa
-una llamada real a Gemini.
+[`docs/API_CONTRACT.md`](docs/API_CONTRACT.md). El servidor usa Gemini para
+clasificar el texto. Si falla o excede el plazo, devuelve `UNKNOWN` con
+`analyzer=UNAVAILABLE`; no atribuye esa respuesta a Gemini.
+
+## Arranque local
+
+Copiar `.env.example` a `backend/.env`, completar `GEMINI_API_KEY` y
+`DEMO_API_TOKEN` y ejecutar `./gradlew :server:run` desde `backend/`.
+`SAFE_BROWSING_API_KEY` se utilizará en la feature posterior de URLs.
+El plazo para Gemini se controla con `GEMINI_TIMEOUT_MS`; para la demo se fijó
+en 20 segundos tras observar respuestas variables, una de ellas de 13,2 s.
+Esto prioriza obtener una clasificación y puede superar el objetivo original
+de 7 segundos para mostrar la alerta. El cliente debe contemplar esa espera.

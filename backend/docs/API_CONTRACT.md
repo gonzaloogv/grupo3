@@ -1,4 +1,4 @@
-# Contrato HTTP B-01
+# Contrato HTTP
 
 Base local de desarrollo: `http://127.0.0.1:8080` después de ejecutar
 `adb reverse tcp:8080 tcp:8080` para el teléfono de demo.
@@ -43,7 +43,7 @@ Solicitud:
 }
 ```
 
-Respuesta temporal de B-01:
+Respuesta cuando Gemini clasifica el mensaje:
 
 ```json
 {
@@ -53,11 +53,11 @@ Respuesta temporal de B-01:
   "reasonCode": "NEW_NUMBER_AND_URGENT_PAYMENT",
   "reasonSimple": "El mensaje dice que tu familiar cambió de número y pide dinero urgente.",
   "action": "VERIFY_KNOWN_CONTACT",
-  "analyzer": "FAKE",
-  "model": null,
+  "analyzer": "GEMINI",
+  "model": "gemini-3.5-flash-lite",
   "promptVersion": "freno-v1",
-  "explanationSource": "TEMPLATE",
-  "decisionSources": ["LOCAL_POLICY"],
+  "explanationSource": "GEMINI",
+  "decisionSources": ["GEMINI"],
   "urlAssessment": {
     "status": "NO_URL",
     "provider": "NONE",
@@ -66,18 +66,20 @@ Respuesta temporal de B-01:
 }
 ```
 
-Esta respuesta determinística sirve solamente para integrar Android y comprobar
-el contrato. `analyzer=FAKE` evita presentarla como una decisión real. B-02
-reemplazará este adaptador por Gemini y conservará los mismos DTO. Si se
-envían URLs durante el modo de prueba, la evaluación queda `UNAVAILABLE`;
-`FAKE` no representa una consulta real a Google Safe Browsing.
+El motivo de `GEMINI` se valida y se redactan identificadores reconocibles
+antes de enviarlos y antes de devolver la explicación. Una respuesta inválida,
+un fallo del proveedor o el vencimiento de `GEMINI_TIMEOUT_MS` produce
+`risk=UNKNOWN`, `category=UNKNOWN`, `reasonCode=ANALYSIS_UNAVAILABLE`,
+`action=NONE`, `analyzer=UNAVAILABLE`, `model=null`,
+`explanationSource=UNAVAILABLE` y `decisionSources=["LOCAL_POLICY"]`.
+No se presenta como una evaluación de seguridad realizada por Gemini.
 
 `urls` admite hasta tres URLs HTTP(S) absolutas con host. Se rechaza la
 solicitud con `400 Bad Request` si excede ese límite o contiene otro esquema.
 Puede omitirse durante la transición del cliente; equivale a `[]`. El servidor
 no abre las URLs en este paso.
 
-Ejemplo con una URL durante el modo de prueba:
+Ejemplo con una URL antes de incorporar Google Safe Browsing:
 
 ```json
 {
@@ -90,9 +92,12 @@ Ejemplo con una URL durante el modo de prueba:
 }
 ```
 
-La respuesta mantiene la clasificación `FAKE` anterior, pero usa
+La respuesta mantiene la clasificación textual de Gemini, pero usa
 `"urlAssessment":{"status":"UNAVAILABLE","provider":"NONE","threatTypes":[]}`.
 Esto indica que aún no hubo una consulta real de reputación.
+
+El analizador determinístico `FAKE` solo se usa en pruebas del servidor;
+nunca debe mostrarse como una clasificación real al usuario.
 
 ## Valores cerrados
 

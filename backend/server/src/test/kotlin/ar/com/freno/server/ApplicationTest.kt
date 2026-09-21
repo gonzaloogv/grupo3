@@ -130,6 +130,9 @@ class ApplicationTest {
         demoApiToken = demoToken,
         timeZone = "America/Argentina/Buenos_Aires",
         promptVersion = "freno-v1",
+        geminiApiKey = "test-gemini-key",
+        geminiModel = "gemini-3.5-flash-lite",
+        geminiTimeoutMillis = 5_000,
     )
 
     private fun validRequestBody() =
