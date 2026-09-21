@@ -62,3 +62,10 @@ Cada rama nace del último `develop`, contiene una sola feature y vuelve por PR:
 
 Antes de iniciar una rama: actualizar `develop`, comprobar que el árbol esté
 limpio y no modificar el contrato compartido sin coordinar con Android.
+
+## Contrato HTTP
+
+El contrato inicial, los encabezados y ejemplos de B-01 están documentados en
+[`docs/API_CONTRACT.md`](docs/API_CONTRACT.md). Hasta integrar B-02, el servidor
+responde con un analizador determinístico identificado como `FAKE`; no representa
+una llamada real a Gemini.

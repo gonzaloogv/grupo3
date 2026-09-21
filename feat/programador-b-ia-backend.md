@@ -18,9 +18,9 @@ Exponer `GET /health` y `POST /v1/analyze`, inicialmente con respuesta de prueba
 
 **Dependencia:** arranque.
 
-- [ ] A puede invocar y deserializar el contrato compartido.
-- [ ] Solicitudes sin token válido se rechazan; health no expone secretos.
-- [ ] Los enums coinciden con los ejemplos y errores documentados.
+- [x] A puede invocar y deserializar el contrato compartido.
+- [x] Solicitudes sin token válido se rechazan; health no expone secretos.
+- [x] Los enums coinciden con los ejemplos y errores documentados.
 
 ## B-02 · Clasificación real con Gemini · 40 min
 
