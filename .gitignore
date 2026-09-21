@@ -15,6 +15,7 @@ build/
 out/
 *.class
 *.hprof
+*.apk
 
 # IDEs y editores
 .idea/
