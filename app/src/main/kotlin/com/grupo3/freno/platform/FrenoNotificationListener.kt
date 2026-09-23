@@ -29,6 +29,7 @@ class FrenoNotificationListener : NotificationListenerService() {
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
+        FrenoOverlay.dismiss()
         if (currentListener === this) currentListener = null
         _connected.value = false
         Log.w(TAG, "Listener disconnected; requesting rebind")

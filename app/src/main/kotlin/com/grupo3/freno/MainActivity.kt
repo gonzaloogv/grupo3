@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.grupo3.freno.platform.FrenoNotificationListener
+import com.grupo3.freno.platform.FrenoOverlay
 import com.grupo3.freno.data.FrenoEventStore
 import com.grupo3.freno.ui.FrenoApp
 import com.grupo3.freno.ui.PermissionSnapshot
@@ -47,9 +48,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        isForeground = true
+        FrenoOverlay.dismiss()
+    }
+
     override fun onResume() {
         super.onResume()
-        isForeground = true
         requestAlertNotificationPermission()
         if (hasNotificationAccess()) {
             NotificationListenerService.requestRebind(ComponentName(this, FrenoNotificationListener::class.java))
@@ -72,9 +78,9 @@ class MainActivity : ComponentActivity() {
         requestAlertNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
-    override fun onPause() {
+    override fun onStop() {
         isForeground = false
-        super.onPause()
+        super.onStop()
     }
 
     private fun openNotificationAccess() {

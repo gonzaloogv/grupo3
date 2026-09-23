@@ -66,6 +66,7 @@ object FrenoEventStore {
             }.onFailure { Log.w(TAG, "Could not restore recent notification keys", it) }
             if (_events.value.isEmpty()) {
                 _events.value = loadEvents(storage)
+                persistEvents()
             }
         }
     }
@@ -265,7 +266,7 @@ object FrenoEventStore {
                 action = enumValueOf(event.getString("action")),
                 explanationSource = enumValueOf(event.getString("explanationSource")),
                 contentIncomplete = event.optBoolean("contentIncomplete"),
-            )
+            ).recoverInterruptedAnalysis()
         }
     }.getOrElse {
         Log.w(TAG, "Could not restore saved history", it)

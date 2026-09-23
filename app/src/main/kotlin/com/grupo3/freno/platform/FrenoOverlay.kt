@@ -1,11 +1,13 @@
 package com.grupo3.freno.platform
 
+import android.app.KeyguardManager
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
@@ -14,6 +16,7 @@ import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import com.grupo3.freno.MainActivity
 import com.grupo3.freno.data.FrenoEventStore
 import com.grupo3.freno.model.FrenoEvent
 
@@ -27,6 +30,10 @@ object FrenoOverlay {
 
     fun show(context: Context, event: FrenoEvent, onShown: () -> Unit) {
         mainHandler.post {
+            if (MainActivity.isForeground ||
+                !context.getSystemService(PowerManager::class.java).isInteractive ||
+                context.getSystemService(KeyguardManager::class.java).isKeyguardLocked
+            ) return@post
             if (currentView != null) {
                 currentReasonView?.text = event.reason
                 Log.i(TAG, "High-risk overlay updated")
