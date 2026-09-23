@@ -1,5 +1,6 @@
 package com.grupo3.freno.orchestration
 
+import com.grupo3.freno.BuildConfig
 import com.grupo3.freno.model.ExplanationSource
 import com.grupo3.freno.model.RecommendedAction
 import com.grupo3.freno.model.RiskLevel
@@ -12,8 +13,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 class HttpRiskAnalyzer(
-    private val baseUrl: String = "http://192.168.0.220:8080",
-    private val token: String = "replace-with-a-long-random-token",
+    private val baseUrl: String = BuildConfig.API_BASE_URL,
+    private val token: String = BuildConfig.API_TOKEN,
 ) : RiskAnalyzer {
 
     override suspend fun analyze(request: AnalysisRequest): AnalysisResult = withContext(Dispatchers.IO) {
@@ -25,7 +26,7 @@ class HttpRiskAnalyzer(
                 requestMethod = "POST"
                 doOutput = true
                 connectTimeout = 8000
-                readTimeout = 15000
+                readTimeout = 30000
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 setRequestProperty("Authorization", "Bearer $token")
             }

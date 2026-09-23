@@ -58,6 +58,35 @@ adb reverse tcp:8080 tcp:8080
 
 La app de desarrollo podrá apuntar a `http://127.0.0.1:8080` usando ese túnel. Ajustar ambos puertos al servidor real, volver a comprobar el túnel después de reconectar el teléfono y permitir HTTP únicamente para ese destino en la configuración debug. Ver [ARQUITECTURA.md](ARQUITECTURA.md).
 
+## Backend local y emulador
+
+Completar las claves en `backend/.env` y asignar un `DEMO_API_TOKEN` propio.
+Desde la raíz del proyecto, iniciar el servidor con:
+
+```powershell
+.\tools\run-backend.ps1
+```
+
+El servidor queda activo mientras ese proceso siga abierto. Su estado se consulta
+en `http://127.0.0.1:8080/health`. Para probar únicamente desde esta PC, usar
+`SERVER_HOST=127.0.0.1` en `backend/.env`.
+
+Agregar en el `local.properties` de la raíz, conservando `sdk.dir`:
+
+```properties
+freno.api.baseUrl=http://10.0.2.2:8080
+freno.api.token=EL_MISMO_DEMO_API_TOKEN_DEL_BACKEND
+```
+
+`10.0.2.2` permite al emulador acceder al servidor de esta PC. Ambos archivos de
+configuración local están excluidos de Git. Las claves de Gemini y Safe Browsing
+se guardan únicamente en el backend; la app usa el token de acceso de la demo.
+Tras cambiar estas propiedades, sincronizar Gradle y volver a ejecutar `app`.
+
+Para probar la captura, habilitar **Leer notificaciones** en Freno y generar un
+SMS desde los controles del emulador (**More > Phone > Send Message**). El
+servidor debe estar activo para obtener la evaluación de riesgo.
+
 ## Criterio para pasar de develop a main
 
 - APK compilada desde la versión integrada e instalada en el teléfono de la demo.

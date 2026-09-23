@@ -1,7 +1,15 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+val localProperties = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
+}
+val apiBaseUrl = localProperties.getProperty("freno.api.baseUrl", "http://10.0.2.2:8080")
+val apiToken = localProperties.getProperty("freno.api.token", "")
 
 android {
     namespace = "com.grupo3.freno"
@@ -13,9 +21,12 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
+        buildConfigField("String", "API_BASE_URL", "\"${apiBaseUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
+        buildConfigField("String", "API_TOKEN", "\"${apiToken.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
     }
 
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 
