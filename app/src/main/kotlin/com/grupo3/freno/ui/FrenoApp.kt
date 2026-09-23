@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,14 +24,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Security
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -90,8 +86,6 @@ data class PermissionSnapshot(
     val allGranted: Boolean get() = notificationAccess && overlayAccess
 }
 
-private enum class EventFilter { BLOCKED, TRUSTED }
-
 @Composable
 fun FrenoApp(
     permissions: PermissionSnapshot,
@@ -100,13 +94,13 @@ fun FrenoApp(
 ) {
     val events by FrenoEventStore.events.collectAsStateWithLifecycle()
     val highRiskAlert by FrenoEventStore.activeAlert.collectAsStateWithLifecycle()
-    var filter by remember { mutableStateOf(EventFilter.BLOCKED) }
-    var selectedEvent by remember { mutableStateOf<FrenoEvent?>(null) }
+    var filter by remember { mutableStateOf(EventFilter.HISTORY) }
+    var selectedEventId by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val blocked = events.filterNot(FrenoEvent::trusted)
-    val trusted = events.filter(FrenoEvent::trusted)
-    val visibleEvents = if (filter == EventFilter.BLOCKED) blocked else trusted
+    val riskCount = events.count { it.analysisPresentation.requiresAttention }
+    val trustedCount = events.count(FrenoEvent::trusted)
+    val visibleEvents = events.filter(filter::accepts)
 
     Scaffold(
         containerColor = Canvas,
@@ -121,12 +115,12 @@ fun FrenoApp(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item(key = "app-header") { AppHeader(permissions.allGranted) }
-            item(key = "summary") { ProtectionSummary(blockedCount = blocked.size) }
+            item(key = "summary") { ProtectionSummary(riskCount = riskCount) }
             item(key = "filters") {
                 EventTabs(
                     selected = filter,
-                    blockedCount = blocked.size,
-                    trustedCount = trusted.size,
+                    totalCount = events.size,
+                    trustedCount = trustedCount,
                     onSelected = { filter = it },
                 )
             }
@@ -137,14 +131,14 @@ fun FrenoApp(
                 items(visibleEvents, key = FrenoEvent::id) { event ->
                     NotificationEventCard(
                         event = event,
-                        onOpenDetail = { selectedEvent = event },
+                        onOpenDetail = { selectedEventId = event.id },
                         onToggleTrust = {
                             if (event.trusted) {
                                 FrenoEventStore.distrust(event.id)
-                                scope.launch { snackbarHostState.showSnackbar("Volvió a Bloqueadas") }
+                                scope.launch { snackbarHostState.showSnackbar("Se quitó tu confianza del mensaje") }
                             } else {
                                 FrenoEventStore.trust(event.id)
-                                scope.launch { snackbarHostState.showSnackbar("Se movió a Confiadas") }
+                                scope.launch { snackbarHostState.showSnackbar("Mensaje marcado como confiado por vos") }
                             }
                         },
                     )
@@ -170,8 +164,8 @@ fun FrenoApp(
     highRiskAlert?.let { event ->
         CriticalAlert(event = event, onDismiss = FrenoEventStore::dismissAlert)
     }
-    selectedEvent?.let { event ->
-        EventDetail(event = event, onDismiss = { selectedEvent = null })
+    events.find { it.id == selectedEventId }?.let { event ->
+        EventDetail(event = event, onDismiss = { selectedEventId = null })
     }
 }
 
@@ -258,11 +252,7 @@ private fun EventDetail(event: FrenoEvent, onDismiss: () -> Unit) {
                     modifier = Modifier.padding(top = 8.dp),
                 )
                 Text(
-                    text = if (event.risk == com.grupo3.freno.model.RiskLevel.HIGH) {
-                        "¿Por qué se marcó?"
-                    } else {
-                        "Resultado del análisis"
-                    },
+                    text = event.analysisPresentation.label,
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(top = 20.dp),
                 )
@@ -347,7 +337,7 @@ private fun AppHeader(allPermissionsGranted: Boolean) {
 }
 
 @Composable
-private fun ProtectionSummary(blockedCount: Int) {
+private fun ProtectionSummary(riskCount: Int) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -355,20 +345,20 @@ private fun ProtectionSummary(blockedCount: Int) {
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
             Text(
-                text = blockedCount.toString(),
+                text = riskCount.toString(),
                 color = Color.White,
                 fontSize = 48.sp,
                 lineHeight = 52.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = if (blockedCount == 1) "notificación bloqueada" else "notificaciones bloqueadas",
+                text = if (riskCount == 1) "mensaje con señales de riesgo" else "mensajes con señales de riesgo",
                 color = Color.White,
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.semantics { heading() },
             )
             Text(
-                text = "Freno las detuvo antes de que pudieras abrir sus enlaces.",
+                text = "Incluye los mensajes de riesgo alto y los que requieren revisión.",
                 color = Color.White.copy(alpha = 0.78f),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 8.dp),
@@ -380,7 +370,7 @@ private fun ProtectionSummary(blockedCount: Int) {
 @Composable
 private fun EventTabs(
     selected: EventFilter,
-    blockedCount: Int,
+    totalCount: Int,
     trustedCount: Int,
     onSelected: (EventFilter) -> Unit,
 ) {
@@ -392,9 +382,9 @@ private fun EventTabs(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         EventTab(
-            label = "Bloqueadas ($blockedCount)",
-            selected = selected == EventFilter.BLOCKED,
-            onClick = { onSelected(EventFilter.BLOCKED) },
+            label = "Historial ($totalCount)",
+            selected = selected == EventFilter.HISTORY,
+            onClick = { onSelected(EventFilter.HISTORY) },
             modifier = Modifier.weight(1f),
         )
         EventTab(
@@ -437,26 +427,34 @@ private fun NotificationEventCard(
     onOpenDetail: () -> Unit,
     onToggleTrust: () -> Unit,
 ) {
+    val analysis = event.analysisPresentation
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .semantics {
-                contentDescription = if (event.trusted) {
-                    "Notificación confiada de ${event.sender}, ${event.whenLabel}"
-                } else {
-                    "Notificación bloqueada de ${event.sender}, ${event.whenLabel}"
-                }
+                contentDescription = "${analysis.label}, notificación de ${event.sender}, ${event.whenLabel}" +
+                    if (event.trusted) ", confiada por vos" else ""
             },
         shape = RoundedCornerShape(20.dp),
         color = Color.White,
         border = BorderStroke(1.dp, Border),
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                StatusBadge(trusted = event.trusted)
-                Spacer(modifier = Modifier.weight(1f))
-                Text(event.whenLabel, color = InkMuted, style = MaterialTheme.typography.labelMedium)
+            StatusBadge(analysis = analysis)
+            if (event.trusted) {
+                Text(
+                    "Confiada por vos",
+                    color = InkMuted,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             }
+            Text(
+                event.whenLabel,
+                color = InkMuted,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(top = 8.dp),
+            )
             Text(
                 text = event.sender,
                 style = MaterialTheme.typography.titleMedium,
@@ -476,12 +474,12 @@ private fun NotificationEventCard(
                 Icon(
                     imageVector = Icons.Rounded.Info,
                     contentDescription = null,
-                    tint = if (event.trusted) Safe else Danger,
+                    tint = analysis.color,
                     modifier = Modifier.size(22.dp),
                 )
                 Column(modifier = Modifier.padding(start = 10.dp).weight(1f)) {
                     Text(
-                        text = if (event.trusted) "Por qué está confiada" else "Por qué la bloqueó",
+                        text = "Resultado del análisis",
                         style = MaterialTheme.typography.labelLarge,
                         color = Ink,
                     )
@@ -503,9 +501,9 @@ private fun NotificationEventCard(
             )
             Text(
                 text = if (event.trusted) {
-                    "Desconfiar devuelve este evento a la lista de bloqueadas."
+                    "Tu confianza es manual y no cambia el resultado del análisis."
                 } else {
-                    "Confiar mueve solo este evento; no habilita futuros mensajes."
+                    "Confiar marca solo este evento; no habilita futuros mensajes."
                 },
                 style = MaterialTheme.typography.labelMedium,
                 color = InkMuted,
@@ -516,29 +514,43 @@ private fun NotificationEventCard(
 }
 
 @Composable
-private fun StatusBadge(trusted: Boolean) {
+private fun StatusBadge(analysis: EventAnalysis) {
     Surface(
         shape = RoundedCornerShape(999.dp),
-        color = if (trusted) Safe.copy(alpha = 0.1f) else DangerSoft,
-        contentColor = if (trusted) Safe else Danger,
+        color = analysis.color.copy(alpha = 0.1f),
+        contentColor = analysis.color,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = if (trusted) Icons.Rounded.Check else Icons.Rounded.Lock,
+                imageVector = when (analysis) {
+                    EventAnalysis.HIGH, EventAnalysis.REVIEW -> Icons.Rounded.Warning
+                    EventAnalysis.LOW -> Icons.Rounded.CheckCircle
+                    EventAnalysis.ANALYZING -> Icons.Rounded.History
+                    EventAnalysis.UNAVAILABLE -> Icons.Rounded.Info
+                },
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
             )
             Text(
-                text = if (trusted) "CONFIADA" else "BLOQUEADA",
+                text = analysis.label,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(start = 6.dp),
             )
         }
     }
 }
+
+private val EventAnalysis.color: Color
+    get() = when (this) {
+        EventAnalysis.HIGH -> Danger
+        EventAnalysis.REVIEW -> Color(0xFF8A4B08)
+        EventAnalysis.LOW -> Safe
+        EventAnalysis.ANALYZING -> SafetyBlue
+        EventAnalysis.UNAVAILABLE -> InkMuted
+    }
 
 @Composable
 private fun TrustActionButton(trusted: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -569,7 +581,7 @@ private fun TrustActionButton(trusted: Boolean, onClick: () -> Unit, modifier: M
             modifier = Modifier.size(22.dp),
         )
         Text(
-            text = if (trusted) "Desconfiar" else "Confiar",
+            text = if (trusted) "Quitar confianza" else "Confiar",
             modifier = Modifier.padding(start = 8.dp),
             style = MaterialTheme.typography.labelLarge,
         )
@@ -677,14 +689,14 @@ private fun EmptyEvents(filter: EventFilter) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Icon(
-                imageVector = if (filter == EventFilter.BLOCKED) Icons.Rounded.Security else Icons.Rounded.History,
+                imageVector = Icons.Rounded.History,
                 contentDescription = null,
                 tint = InkMuted,
                 modifier = Modifier.size(40.dp),
             )
             Text(
-                text = if (filter == EventFilter.BLOCKED) {
-                    "Todavía no hay notificaciones bloqueadas"
+                text = if (filter == EventFilter.HISTORY) {
+                    "Todavía no hay notificaciones en el historial"
                 } else {
                     "Todavía no confiaste ninguna notificación"
                 },
