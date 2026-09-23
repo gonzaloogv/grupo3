@@ -1,0 +1,34 @@
+name: freno
+
+services:
+  backend:
+    image: eclipse-temurin:21-jre-noble@sha256:7739f0ffce786528961eea6bf46d9610ee968ac6127c9b2e93494757bdecce9f
+    restart: unless-stopped
+    user: "1000:1000"
+    working_dir: /opt/freno
+    entrypoint: ["/opt/freno/bin/server"]
+    command: ["/run/secrets/freno.env"]
+    environment:
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "8080"
+      JAVA_OPTS: "-Xms64m -Xmx256m -XX:ActiveProcessorCount=2"
+    ports:
+      - "${FRENO_BIND_IP:-127.0.0.1}:8081:8080"
+    volumes:
+      - ./app:/opt/freno:ro
+      - ./.env.backend:/run/secrets/freno.env:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
