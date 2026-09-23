@@ -10,8 +10,15 @@ if (-not $env:JAVA_HOME) {
     $javaInstallation = Get-ChildItem (Join-Path $env:USERPROFILE '.jdks') -Directory -Filter '*21*' -ErrorAction SilentlyContinue |
         Where-Object { Test-Path (Join-Path $_.FullName 'bin\java.exe') } |
         Select-Object -First 1
-    if (-not $javaInstallation) { throw 'Configurá JAVA_HOME con la ubicación de un JDK 21.' }
-    $env:JAVA_HOME = $javaInstallation.FullName
+    if ($javaInstallation) {
+        $env:JAVA_HOME = $javaInstallation.FullName
+    } else {
+        $androidStudioJdk = 'C:\Program Files\Android\Android Studio\jbr'
+        if (-not (Test-Path (Join-Path $androidStudioJdk 'bin\java.exe'))) {
+            throw 'No se encontró un JDK. Configurá JAVA_HOME o instalá Android Studio.'
+        }
+        $env:JAVA_HOME = $androidStudioJdk
+    }
 }
 
 Push-Location $backendDirectory

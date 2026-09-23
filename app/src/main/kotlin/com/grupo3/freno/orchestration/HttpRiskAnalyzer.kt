@@ -26,7 +26,7 @@ class HttpRiskAnalyzer(
                 requestMethod = "POST"
                 doOutput = true
                 connectTimeout = 8000
-                readTimeout = 30000
+                readTimeout = 70000
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 setRequestProperty("Authorization", "Bearer $token")
             }

@@ -74,6 +74,7 @@ import com.grupo3.freno.ui.theme.Canvas
 import com.grupo3.freno.ui.theme.Danger
 import com.grupo3.freno.ui.theme.DangerSoft
 import com.grupo3.freno.ui.theme.Ink
+import com.grupo3.freno.platform.FrenoNotificationListener
 import com.grupo3.freno.ui.theme.InkMuted
 import com.grupo3.freno.ui.theme.Safe
 import com.grupo3.freno.ui.theme.SafetyBlue
@@ -82,8 +83,9 @@ import kotlinx.coroutines.launch
 data class PermissionSnapshot(
     val notificationAccess: Boolean = false,
     val overlayAccess: Boolean = false,
+    val alertNotificationAccess: Boolean = false,
 ) {
-    val allGranted: Boolean get() = notificationAccess && overlayAccess
+    val allGranted: Boolean get() = notificationAccess && overlayAccess && alertNotificationAccess
 }
 
 @Composable
@@ -91,8 +93,10 @@ fun FrenoApp(
     permissions: PermissionSnapshot,
     onRequestNotificationAccess: () -> Unit,
     onRequestOverlayAccess: () -> Unit,
+    onRequestAlertNotificationAccess: () -> Unit,
 ) {
     val events by FrenoEventStore.events.collectAsStateWithLifecycle()
+    val listenerConnected by FrenoNotificationListener.connected.collectAsStateWithLifecycle()
     val highRiskAlert by FrenoEventStore.activeAlert.collectAsStateWithLifecycle()
     var filter by remember { mutableStateOf(EventFilter.HISTORY) }
     var selectedEventId by remember { mutableStateOf<String?>(null) }
@@ -114,7 +118,9 @@ fun FrenoApp(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 40.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item(key = "app-header") { AppHeader(permissions.allGranted) }
+            item(key = "app-header") {
+                AppHeader(permissions.allGranted && listenerConnected)
+            }
             item(key = "summary") { ProtectionSummary(riskCount = riskCount) }
             item(key = "filters") {
                 EventTabs(
@@ -154,8 +160,10 @@ fun FrenoApp(
             item(key = "permissions-card") {
                 PermissionsCard(
                     permissions = permissions,
+                    listenerConnected = listenerConnected,
                     onRequestNotificationAccess = onRequestNotificationAccess,
                     onRequestOverlayAccess = onRequestOverlayAccess,
+                    onRequestAlertNotificationAccess = onRequestAlertNotificationAccess,
                 )
             }
         }
@@ -604,8 +612,10 @@ private fun SectionTitle(title: String, supporting: String) {
 @Composable
 private fun PermissionsCard(
     permissions: PermissionSnapshot,
+    listenerConnected: Boolean,
     onRequestNotificationAccess: () -> Unit,
     onRequestOverlayAccess: () -> Unit,
+    onRequestAlertNotificationAccess: () -> Unit,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -621,6 +631,13 @@ private fun PermissionsCard(
                 granted = permissions.notificationAccess,
                 onRequest = onRequestNotificationAccess,
             )
+            if (permissions.notificationAccess && !listenerConnected) {
+                Text(
+                    "El servicio de notificaciones se está conectando. Si no cambia, cerrá y abrí Freno.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Danger,
+                )
+            }
             HorizontalDivider(color = Border)
             PermissionRow(
                 icon = Icons.Rounded.Security,
@@ -628,6 +645,14 @@ private fun PermissionsCard(
                 description = "Abre la advertencia roja encima de otras apps.",
                 granted = permissions.overlayAccess,
                 onRequest = onRequestOverlayAccess,
+            )
+            HorizontalDivider(color = Border)
+            PermissionRow(
+                icon = Icons.Rounded.Notifications,
+                title = "Avisos de riesgo",
+                description = "Muestra un aviso si el teléfono está bloqueado.",
+                granted = permissions.alertNotificationAccess,
+                onRequest = onRequestAlertNotificationAccess,
             )
         }
     }
@@ -721,9 +746,11 @@ private fun FrenoHomePreview() {
             permissions = PermissionSnapshot(
                 notificationAccess = true,
                 overlayAccess = true,
+                alertNotificationAccess = true,
             ),
             onRequestNotificationAccess = {},
             onRequestOverlayAccess = {},
+            onRequestAlertNotificationAccess = {},
         )
     }
 }

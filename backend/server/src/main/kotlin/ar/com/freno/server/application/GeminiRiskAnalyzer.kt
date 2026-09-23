@@ -88,7 +88,12 @@ class GeminiRiskAnalyzer(
             fallback
         } catch (error: Exception) {
             val fallback = unavailable(input)
-            log(input.eventId, fallback.risk, start, error::class.java.simpleName)
+            val detail = error.message
+                ?.take(160)
+                ?.replace(Regex("[^A-Za-z0-9 .:_-]"), "_")
+                .orEmpty()
+            log(input.eventId, fallback.risk, start,
+                "${error::class.java.simpleName}:${detail}")
             fallback
         }
     }
@@ -115,7 +120,9 @@ class GeminiRiskAnalyzer(
         )
         val usesTemplate = !ExplanationTemplates.isSafe(safeClassification.reasonSimple)
         require(safeClassification.isValidFor(SensitiveDataRedactor.redact(input.text))) {
-            "Invalid Gemini classification"
+            "Invalid Gemini classification risk=${safeClassification.risk} " +
+                "category=${safeClassification.category} " +
+                "reasonCode=${safeClassification.reasonCode} action=${safeClassification.action}"
         }
         return ValidatedClassification(safeClassification, usesTemplate)
     }

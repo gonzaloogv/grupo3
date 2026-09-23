@@ -5,7 +5,7 @@
 # Herramientas: JDK 17 para la app Android, JDK 21 para el backend,
 # Android SDK platform 37 y build-tools 37.0.0.
 #
-# Plugins Gradle: com.android.application 9.4.0, Kotlin 2.4.10.
+# Plugins Gradle: com.android.application 9.3.0, Kotlin 2.4.10.
 #
 # Android/Compose: Compose BOM 2026.09.00, activity-compose 1.13.0,
 # lifecycle-runtime-ktx 2.11.0, lifecycle-runtime-compose 2.11.0,

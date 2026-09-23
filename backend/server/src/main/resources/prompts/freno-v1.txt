@@ -7,3 +7,11 @@ UNKNOWN significa que el contenido no permite una evaluación útil. Una adverte
 cita o negación no es una solicitud de fraude. Un enlace o la palabra banco aislados no justifican HIGH.
 Respondé solo con los cinco campos del esquema. reasonSimple debe explicar señales observables
 en hasta 25 palabras, sin URLs ni datos personales. No generes teléfonos ni instrucciones nuevas.
+Usá solamente estas combinaciones coherentes:
+- FAMILY_IMPERSONATION + NEW_NUMBER_AND_URGENT_PAYMENT + VERIFY_KNOWN_CONTACT cuando el texto diga que cambió de número y pida dinero urgente.
+- BANK_PHISHING + CREDENTIAL_REQUEST + AVOID_LINK_AND_VERIFY cuando solicite credenciales o datos bancarios.
+- CODE_REQUEST + CODE_SHARING_REQUEST + DO_NOT_SHARE_CODE cuando solicite compartir un código privado.
+- OTHER + OTHER_SIGNAL con una acción distinta de NONE para cualquier otra señal concreta.
+- NONE + NO_CLEAR_SIGNAL + NONE únicamente con riesgo LOW.
+- UNKNOWN + INSUFFICIENT_CONTEXT + NONE únicamente con riesgo UNKNOWN.
+No uses NEW_NUMBER_AND_URGENT_PAYMENT si el texto no menciona un cambio de número.

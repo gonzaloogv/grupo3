@@ -8,8 +8,22 @@ plugins {
 val localProperties = Properties().apply {
     rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
 }
+val backendEnvironment = rootProject.file("backend/.env")
+    .takeIf { it.isFile }
+    ?.readLines()
+    ?.mapNotNull { line ->
+        val trimmed = line.trim()
+        if (trimmed.isEmpty() || trimmed.startsWith('#')) return@mapNotNull null
+        val separator = trimmed.indexOf('=')
+        if (separator < 1) return@mapNotNull null
+        trimmed.substring(0, separator).trim() to
+            trimmed.substring(separator + 1).trim().trim('"', '\'')
+    }
+    ?.toMap()
+    .orEmpty()
 val apiBaseUrl = localProperties.getProperty("freno.api.baseUrl", "http://10.0.2.2:8080")
-val apiToken = localProperties.getProperty("freno.api.token", "")
+val apiToken = localProperties.getProperty("freno.api.token")
+    ?: backendEnvironment["DEMO_API_TOKEN"].orEmpty()
 
 android {
     namespace = "com.grupo3.freno"
@@ -34,10 +48,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
-}
-
-kotlin {
-    jvmToolchain(21)
 }
 
 dependencies {
